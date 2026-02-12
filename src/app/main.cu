@@ -758,8 +758,8 @@ void print_cuda_info() {
 int main(int argc, char** argv) {
     print_cuda_info();
 
-    int width = 800;
-    int height = 600;
+    int width = 1920;
+    int height = 1080;
 
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
@@ -769,8 +769,8 @@ int main(int argc, char** argv) {
             height = std::stoi(argv[++i]);
         } else if (arg == "--help") {
             std::cout << "Usage: lumina [options]" << std::endl;
-            std::cout << "  --width <n>   Window width (default: 800)" << std::endl;
-            std::cout << "  --height <n>  Window height (default: 600)" << std::endl;
+            std::cout << "  --width <n>   Window width (default: 1920)" << std::endl;
+            std::cout << "  --height <n>  Window height (default: 1080)" << std::endl;
             return 0;
         }
     }
