@@ -369,6 +369,14 @@ Scene create_demo_scene() {
 
     // Helper to add a sphere (tessellated)
     auto add_sphere = [&](float3 center, float radius, int mat_id, int segments = 16) {
+        auto add_smooth_sphere_triangle = [&](const float3& a, const float3& b, const float3& c) {
+            Triangle tri(a, b, c, mat_id);
+            tri.n0 = normalize(a - center);
+            tri.n1 = normalize(b - center);
+            tri.n2 = normalize(c - center);
+            scene.add_triangle(tri);
+        };
+
         for (int i = 0; i < segments; i++) {
             for (int j = 0; j < segments * 2; j++) {
                 float theta0 = PI * float(i) / float(segments);
@@ -398,10 +406,10 @@ Scene create_demo_scene() {
                 );
 
                 if (i > 0) {
-                    scene.add_triangle(Triangle(p00, p10, p01, mat_id));
+                    add_smooth_sphere_triangle(p00, p10, p01);
                 }
                 if (i < segments - 1) {
-                    scene.add_triangle(Triangle(p10, p11, p01, mat_id));
+                    add_smooth_sphere_triangle(p10, p11, p01);
                 }
             }
         }
