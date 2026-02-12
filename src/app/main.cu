@@ -597,9 +597,9 @@ Scene create_demo_scene() {
     add_octahedron(::make_float3(2.55f, 1.1f, 3.25f), 0.62f, 0.5f, mango_diffuse);
     add_torus(::make_float3(4.05f, 1.65f, 3.8f), 0.78f, 0.24f, 0.35f, pearl_metal, 24, 12);
 
-    // Stacked blocks in the back-right corner
-    add_box(::make_float3(5.95f, 0.35f, 5.55f), ::make_float3(1.0f, 0.7f, 1.0f), 0.35f, obsidian_metal);
-    add_box(::make_float3(5.95f, 0.92f, 5.55f), ::make_float3(0.68f, 0.44f, 0.68f), -0.2f, rose_gold_metal);
+    // Accent cubes (separated and more visible from the default camera)
+    add_box(::make_float3(6.25f, 0.45f, 3.6f), ::make_float3(0.9f, 0.9f, 0.9f), 0.12f, obsidian_metal);
+    add_box(::make_float3(4.25f, 0.36f, 4.35f), ::make_float3(0.72f, 0.72f, 0.72f), -0.5f, rose_gold_metal);
 
     // Keep global scene scaling as a single tuning knob.
     const float scene_scale = 1.0f;
