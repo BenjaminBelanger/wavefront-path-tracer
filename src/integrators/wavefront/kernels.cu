@@ -272,7 +272,10 @@ __global__ void shade_surface_kernel(
 
     // Spawn new ray
     Ray new_ray;
-    new_ray.origin = hit_pos + ctx.geometric_normal * RAY_EPSILON;
+    // Offset along the side of the surface the new ray is traveling to.
+    // This avoids self-intersections and fixes incorrect glass behavior.
+    float origin_sign = (dot(sample.wi, ctx.geometric_normal) >= 0.0f) ? 1.0f : -1.0f;
+    new_ray.origin = hit_pos + ctx.geometric_normal * (RAY_EPSILON * origin_sign);
     new_ray.direction = sample.wi;
     new_ray.t_min = RAY_EPSILON;
     new_ray.t_max = INFINITY_F;
