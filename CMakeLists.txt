@@ -100,6 +100,8 @@ set(APP_SOURCES
     src/app/camera.cuh
     src/app/scene.cuh
     src/app/interactive_runtime.cuh
+    src/app/renderer_runtime.cu
+    src/app/window_runtime.cpp
     src/app/demo_scene.cuh
     src/app/demo_scene.cu
     src/app/main.cu
