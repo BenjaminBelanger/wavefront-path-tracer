@@ -1,4 +1,5 @@
-name: CMake CUDA Build
+# CMake workflow with CUDA support
+name: CMake with CUDA
 
 on:
   push:
@@ -8,27 +9,45 @@ on:
 
 env:
   BUILD_TYPE: Release
-  CUDA_VERSION: "12.1.0" 
+  CUDA_VERSION: "12.3.0"
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    
     steps:
     - uses: actions/checkout@v4
-
+    
     - name: Install CUDA Toolkit
-      uses: Jimver/cuda-toolkit@v0.2.16
+      uses: Jimver/cuda-toolkit@v0.2.14
       id: cuda-toolkit
       with:
         cuda: ${{ env.CUDA_VERSION }}
         method: 'network'
-
+        sub-packages: '["nvcc", "cudart"]'
+    
+    - name: Verify CUDA installation
+      run: |
+        nvcc --version
+        nvidia-smi || echo "No GPU available (expected in GitHub Actions)"
+    
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake
+    
     - name: Configure CMake
       run: |
         cmake -B ${{github.workspace}}/build \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-          -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc
-
+          -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc \
+          -DCMAKE_CUDA_ARCHITECTURES="60;70;75;80;86"
+      env:
+        CUDACXX: /usr/local/cuda/bin/nvcc
+    
     - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} -j$(nproc)
+    
+    - name: Test
+      working-directory: ${{github.workspace}}/build
+      run: ctest -C ${{env.BUILD_TYPE}} --output-on-failure
