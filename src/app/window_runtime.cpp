@@ -1,5 +1,6 @@
 #include "interactive_runtime.cuh"
 
+#include <cstdlib>
 #include <cstdio>
 #include <iostream>
 
@@ -7,6 +8,39 @@
 #define GLFW_INCLUDE_NONE
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
+// Prevent cuda_gl_interop.h from including Windows GL/gl.h, which conflicts with GLAD symbols.
+#if defined(_WIN32)
+#ifndef __gl_h_
+#define __gl_h_
+#endif
+#ifndef __GL_H__
+#define __GL_H__
+#endif
+#endif
+#include <cuda_gl_interop.h>
+
+// Missing from this project's minimal GLAD header.
+#ifndef GL_PIXEL_UNPACK_BUFFER
+#define GL_PIXEL_UNPACK_BUFFER 0x88EC
+#endif
+#ifndef GL_STREAM_DRAW
+#define GL_STREAM_DRAW 0x88E0
+#endif
+
+namespace {
+
+#define CUDA_RUNTIME_CHECK(call)                                                 \
+    do {                                                                         \
+        cudaError_t err__ = call;                                                \
+        if (err__ != cudaSuccess) {                                              \
+            std::cerr << "CUDA error at " << __FILE__ << ":" << __LINE__ << ": "\
+                      << cudaGetErrorString(err__) << std::endl;                 \
+            std::exit(EXIT_FAILURE);                                             \
+        }                                                                        \
+    } while (0)
+
+} // namespace
 
 namespace lumina {
 
@@ -18,6 +52,8 @@ RenderWindow::RenderWindow(int width, int height, const char* title)
     , vao_(0)
     , vbo_(0)
     , texture_(0)
+    , pbo_(0)
+    , cuda_pbo_resource_(nullptr)
     , camera_changed_(true)
     , renderer_(nullptr) {
     if (!glfwInit()) {
@@ -56,7 +92,6 @@ RenderWindow::RenderWindow(int width, int height, const char* title)
     glfwSetKeyCallback(window_, key_callback);
 
     init_gl_resources();
-    pixel_buffer_.resize(width * height * 4);
 
     // Initialize camera controller.
     controller_.camera.look_at(
@@ -70,6 +105,9 @@ RenderWindow::RenderWindow(int width, int height, const char* title)
 }
 
 RenderWindow::~RenderWindow() {
+    if (window_) glfwMakeContextCurrent(window_);
+    if (cuda_pbo_resource_) CUDA_RUNTIME_CHECK(cudaGraphicsUnregisterResource(cuda_pbo_resource_));
+    if (pbo_) glDeleteBuffers(1, &pbo_);
     if (texture_) glDeleteTextures(1, &texture_);
     if (vbo_) glDeleteBuffers(1, &vbo_);
     if (vao_) glDeleteVertexArrays(1, &vao_);
@@ -127,11 +165,20 @@ void RenderWindow::run(InteractiveRenderer& renderer, Scene& scene) {
         // Render a frame.
         renderer.render_frame(controller_.camera, scene);
 
-        // Tonemap and display.
-        renderer.tonemap();
+        // Tonemap directly into the CUDA-mapped OpenGL PBO.
+        uchar4* mapped_buffer = nullptr;
+        size_t mapped_size = 0;
+        CUDA_RUNTIME_CHECK(cudaGraphicsMapResources(1, &cuda_pbo_resource_, 0));
+        CUDA_RUNTIME_CHECK(cudaGraphicsResourceGetMappedPointer(
+            reinterpret_cast<void**>(&mapped_buffer), &mapped_size, cuda_pbo_resource_));
+        if (mapped_size < static_cast<size_t>(width_) * height_ * sizeof(uchar4)) {
+            std::cerr << "Mapped PBO is smaller than expected" << std::endl;
+            CUDA_RUNTIME_CHECK(cudaGraphicsUnmapResources(1, &cuda_pbo_resource_, 0));
+            break;
+        }
+        renderer.tonemap_to_buffer(mapped_buffer);
+        CUDA_RUNTIME_CHECK(cudaGraphicsUnmapResources(1, &cuda_pbo_resource_, 0));
 
-        // Download and display.
-        renderer.download_display(reinterpret_cast<uchar4*>(pixel_buffer_.data()));
         display_frame();
 
         glfwSwapBuffers(window_);
@@ -209,12 +256,23 @@ void RenderWindow::init_gl_resources() {
                  GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glGenBuffers(1, &pbo_);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo_);
+    glBufferData(GL_PIXEL_UNPACK_BUFFER, static_cast<GLsizeiptr>(width_) * height_ * sizeof(uchar4),
+                 nullptr, GL_STREAM_DRAW);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+
+    CUDA_RUNTIME_CHECK(cudaGraphicsGLRegisterBuffer(
+        &cuda_pbo_resource_, pbo_, cudaGraphicsRegisterFlagsWriteDiscard));
 }
 
 void RenderWindow::display_frame() {
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo_);
     glBindTexture(GL_TEXTURE_2D, texture_);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width_, height_,
-                    GL_RGBA, GL_UNSIGNED_BYTE, pixel_buffer_.data());
+                    GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
     glClear(GL_COLOR_BUFFER_BIT);
     glUseProgram(shader_program_);

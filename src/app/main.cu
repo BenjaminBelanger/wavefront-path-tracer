@@ -62,17 +62,17 @@ int main(int argc, char** argv) {
     std::cout << "\nBuilding scene..." << std::endl;
     Scene scene = create_demo_scene();
 
-    // Create renderer
-    std::cout << "Initializing renderer..." << std::endl;
-    InteractiveRenderer renderer(width, height);
-
-    // Create window and run
+    // Create window first so CUDA/GL interop registers against an active GL context.
     RenderWindow window(width, height, "Lumina Path Tracer");
 
     if (!window.is_valid()) {
         std::cerr << "Failed to create window!" << std::endl;
         return 1;
     }
+
+    // Create renderer
+    std::cout << "Initializing renderer..." << std::endl;
+    InteractiveRenderer renderer(width, height);
 
     window.run(renderer, scene);
 
