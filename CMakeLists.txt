@@ -15,8 +15,8 @@ if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     set(CMAKE_CUDA_ARCHITECTURES 75 86 89)
 endif()
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
+# Build type (single-config generators only)
+if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
@@ -99,8 +99,9 @@ set(INTEGRATOR_SOURCES
 set(APP_SOURCES
     src/app/camera.cuh
     src/app/scene.cuh
-    src/app/renderer.cu
-    src/app/window.cpp
+    src/app/interactive_runtime.cuh
+    src/app/demo_scene.cuh
+    src/app/demo_scene.cu
     src/app/main.cu
 )
 
@@ -150,6 +151,11 @@ target_compile_options(lumina PRIVATE
         -Xcompiler=/W3
         -lineinfo
     >
+    $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:-G -g>
+    $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Release>>:-O3>
+)
+target_compile_definitions(lumina PRIVATE
+    $<$<CONFIG:Debug>:LUMINA_DEBUG>
 )
 
 # Enable separable compilation for device code
@@ -157,21 +163,6 @@ set_target_properties(lumina PROPERTIES
     CUDA_SEPARABLE_COMPILATION ON
     CUDA_RESOLVE_DEVICE_SYMBOLS ON
 )
-
-# Debug configuration
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_compile_options(lumina PRIVATE
-        $<$<COMPILE_LANGUAGE:CUDA>:-G -g>
-    )
-    target_compile_definitions(lumina PRIVATE LUMINA_DEBUG)
-endif()
-
-# Release optimization
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    target_compile_options(lumina PRIVATE
-        $<$<COMPILE_LANGUAGE:CUDA>:-O3>
-    )
-endif()
 
 # Copy assets to build directory
 add_custom_command(TARGET lumina POST_BUILD

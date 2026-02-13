@@ -87,8 +87,8 @@ __global__ void build_tree_kernel(
 
     int split = idx + s * d + (d < 0 ? d : 0);
 
-    // Output child pointers
-    int left, right;
+    // Output child pointer
+    int left;
 
     // Left child
     int min_ij = (idx < j) ? idx : j;
@@ -98,19 +98,11 @@ __global__ void build_tree_kernel(
         left = split;  // Internal
     }
 
-    // Right child
-    int max_ij = (idx > j) ? idx : j;
-    if (max_ij == split + 1) {
-        right = num_leaves - 1 + split + 1;  // Leaf
-    } else {
-        right = split + 1;  // Internal
-    }
-
     // Store in node
     nodes[idx].left_or_first = left;
     nodes[idx].prim_count = 0;  // Mark as internal
 
-    // Store right child info (we need to track it separately for bound computation)
+    // Right child follows the compact convention:
     // Use a convention: right child = left_or_first + 1 for consecutive allocation
 }
 
