@@ -5,14 +5,14 @@
 
 namespace lumina {
 
-// =============================================================================
-// Ray Queue for Wavefront Scheduling
-// =============================================================================
 
-// Queue for organizing work by material type for coherent shading
+
+
+
+
 struct MaterialQueue {
-    DeviceBuffer<int> indices;      // Path indices to process
-    DeviceBuffer<unsigned int> count;  // Number of items in queue
+    DeviceBuffer<int> indices;      
+    DeviceBuffer<unsigned int> count;  
 
     void resize(size_t max_count) {
         indices.resize(max_count);
@@ -44,42 +44,42 @@ inline MaterialQueueView make_view(MaterialQueue& queue) {
     return MaterialQueueView{queue.indices.data(), queue.count.data()};
 }
 
-// =============================================================================
-// Work Queue System
-// =============================================================================
+
+
+
 
 enum class QueueType {
-    RayGenerate,    // Generate primary rays
-    Intersect,      // Ray-scene intersection
-    ShadeMiss,      // Process misses (environment)
-    ShadeHit,       // Process hits (material evaluation)
-    ShadowRay,      // Shadow ray tracing
-    Accumulate,     // Write results to framebuffer
+    RayGenerate,    
+    Intersect,      
+    ShadeMiss,      
+    ShadeHit,       
+    ShadowRay,      
+    Accumulate,     
     COUNT
 };
 
 class WorkQueues {
 public:
-    static constexpr int NUM_MATERIAL_QUEUES = 8;  // Max material types
+    static constexpr int NUM_MATERIAL_QUEUES = 8;  
 
     WorkQueues() = default;
 
     void resize(size_t max_paths) {
         max_paths_ = max_paths;
 
-        // Main queues
+        
         active_paths_.resize(max_paths);
         next_paths_.resize(max_paths);
 
         active_count_.resize(1);
         next_count_.resize(1);
 
-        // Material-sorted queues
+        
         for (int i = 0; i < NUM_MATERIAL_QUEUES; i++) {
             material_queues_[i].resize(max_paths);
         }
 
-        // Shadow ray queue
+        
         shadow_queue_.resize(max_paths);
     }
 
@@ -110,7 +110,7 @@ public:
         CUDA_CHECK(cudaMemcpy(active_count_.data(), &count, sizeof(unsigned int), cudaMemcpyHostToDevice));
     }
 
-    // Accessors
+    
     int* active_paths() { return active_paths_.data(); }
     int* next_paths() { return next_paths_.data(); }
     unsigned int* active_count_ptr() { return active_count_.data(); }
@@ -133,7 +133,7 @@ private:
     MaterialQueue shadow_queue_;
 };
 
-// Device-side view
+
 struct WorkQueuesView {
     int* __restrict__ active_paths;
     int* __restrict__ next_paths;
@@ -178,11 +178,11 @@ inline WorkQueuesView make_view(WorkQueues& queues) {
     return view;
 }
 
-// =============================================================================
-// Compaction Utilities
-// =============================================================================
 
-// Stream compaction kernel (remove terminated paths)
+
+
+
+
 static __global__ void compact_paths_kernel(
     const uint32_t* __restrict__ flags,
     const int* __restrict__ input_indices,
@@ -195,14 +195,14 @@ static __global__ void compact_paths_kernel(
 
     int path_idx = input_indices[idx];
 
-    // Check if path is still active
+    
     if (flags[path_idx] & PATH_ACTIVE) {
         unsigned int slot = atomicAdd(output_count, 1);
         output_indices[slot] = path_idx;
     }
 }
 
-// Sort paths by material for coherent shading
+
 static __global__ void sort_by_material_kernel(
     const int* __restrict__ material_ids,
     const int* __restrict__ input_indices,
@@ -220,4 +220,4 @@ static __global__ void sort_by_material_kernel(
     queues[queue_idx].push(path_idx);
 }
 
-} // namespace lumina
+} 

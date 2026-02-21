@@ -9,9 +9,9 @@
 
 namespace lumina {
 
-// =============================================================================
-// Generate Primary Rays Kernel
-// =============================================================================
+
+
+
 
 __global__ void generate_rays_kernel(
     PathStateView paths,
@@ -28,19 +28,19 @@ __global__ void generate_rays_kernel(
 
     int pixel_idx = y * width + x;
 
-    // Initialize RNG for this path
+    
     paths.rng[pixel_idx].init_from_pixel(x, y, frame_number, current_sample);
     PCG32& rng = paths.rng[pixel_idx];
 
-    // Store pixel coordinates
+    
     paths.pixel_x[pixel_idx] = x;
     paths.pixel_y[pixel_idx] = y;
 
-    // Jittered sample within pixel
+    
     float u = (x + rng.next_float()) / float(width);
     float v = (y + rng.next_float()) / float(height);
 
-    // Generate ray (with optional DOF)
+    
     Ray ray;
     if (camera.aperture > 0.0f) {
         ray = camera.generate_ray_dof(u, v, rng.next_float(), rng.next_float());
@@ -50,7 +50,7 @@ __global__ void generate_rays_kernel(
 
     paths.set_ray(pixel_idx, ray);
 
-    // Initialize path state
+    
     paths.set_throughput(pixel_idx, make_float3(1.0f));
     paths.radiance_x[pixel_idx] = 0.0f;
     paths.radiance_y[pixel_idx] = 0.0f;
@@ -59,7 +59,7 @@ __global__ void generate_rays_kernel(
     paths.flags[pixel_idx] = PATH_ACTIVE;
     paths.material_id[pixel_idx] = -1;
 
-    // Initialize spectral data with hero wavelength sampling
+    
     SpectralSample wavelengths = sample_hero_wavelength(rng.next_float());
     for (int i = 0; i < NUM_WAVELENGTHS; i++) {
         paths.wavelengths[i][pixel_idx] = wavelengths.lambda[i];
@@ -68,9 +68,9 @@ __global__ void generate_rays_kernel(
     }
 }
 
-// =============================================================================
-// Ray-Scene Intersection Kernel
-// =============================================================================
+
+
+
 
 __global__ void intersect_kernel(
     PathStateView paths,
@@ -105,7 +105,7 @@ __global__ void intersect_kernel(
         hits.u[path_idx] = u_hit;
         hits.v[path_idx] = v_hit;
 
-        // Compute hit position and interpolated normal
+        
         const Triangle& tri = triangles[prim_id];
         float3 pos = ray.at(t_hit);
         float3 normal = tri.interpolate_normal(u_hit, v_hit);
@@ -128,12 +128,12 @@ __global__ void intersect_kernel(
     }
 }
 
-// =============================================================================
-// Miss Shader (Environment)
-// =============================================================================
+
+
+
 
 __device__ float3 environment_color(const float3& direction) {
-    // Simple sky gradient
+    
     float t = 0.5f * (direction.y + 1.0f);
     float3 sky_blue = make_float3(0.5f, 0.7f, 1.0f);
     float3 white = make_float3(1.0f);
@@ -155,27 +155,27 @@ __global__ void shade_miss_kernel(
         return;
     }
 
-    // Get ray direction
+    
     float3 dir = make_float3(
         paths.ray_dir_x[path_idx],
         paths.ray_dir_y[path_idx],
         paths.ray_dir_z[path_idx]
     );
 
-    // Evaluate environment
+    
     float3 env_color = environment_color(dir);
     float3 throughput = paths.get_throughput(path_idx);
 
-    // Add contribution
+    
     paths.add_radiance(path_idx, throughput * env_color);
 
-    // Terminate path
+    
     paths.set_active(path_idx, false);
 }
 
-// =============================================================================
-// Surface Shading Kernel
-// =============================================================================
+
+
+
 
 __global__ void shade_surface_kernel(
     PathStateView paths,
@@ -198,13 +198,13 @@ __global__ void shade_surface_kernel(
 
     int depth = paths.depth[path_idx];
 
-    // Check max depth
+    
     if (depth >= max_depth) {
         paths.set_active(path_idx, false);
         return;
     }
 
-    // Get hit information
+    
     int mat_id = hits.material_id[path_idx];
     const Material& material = materials[mat_id];
 
@@ -219,33 +219,33 @@ __global__ void shade_surface_kernel(
     );
     float3 wo = -ray_dir;
 
-    // Check for emission
+    
     if (material.is_emissive()) {
         float3 throughput = paths.get_throughput(path_idx);
         float3 emission = material.get_emission();
-        // Always accumulate emissive hits. This integrator currently does not
-        // perform explicit light sampling, so gating this to only primary/specular
-        // paths makes diffuse transport go black.
+        
+        
+        
         paths.add_radiance(path_idx, throughput * emission);
 
         paths.set_active(path_idx, false);
         return;
     }
 
-    // Setup shading context
+    
     ShadingContext ctx;
     ctx.position = hit_pos;
-    // Orient normals so dot(n, wo) > 0 for BSDF evaluation.
-    // Our faceforward helper returns n when dot(n, v) < 0, so use -wo.
+    
+    
     ctx.normal = faceforward(normal, -wo);
     ctx.geometric_normal = faceforward(geom_normal, -wo);
     ctx.wo = wo;
     ctx.build_frame();
 
-    // Get RNG
+    
     PCG32& rng = paths.rng[path_idx];
 
-    // Russian roulette (after depth 3)
+    
     float3 throughput = paths.get_throughput(path_idx);
     if (depth > 3) {
         float continue_prob = russian_roulette_prob(throughput);
@@ -257,7 +257,7 @@ __global__ void shade_surface_kernel(
         paths.set_throughput(path_idx, throughput);
     }
 
-    // Sample BSDF
+    
     BSDFSample sample = sample_bsdf(material, ctx, rng.next_float(), rng.next_float());
 
     if (!sample.is_valid()) {
@@ -265,15 +265,15 @@ __global__ void shade_surface_kernel(
         return;
     }
 
-    // Update throughput: throughput *= f * |cos| / pdf
-    // sample.f already includes |cos|
+    
+    
     float3 bsdf_weight = sample.f / sample.pdf;
     paths.multiply_throughput(path_idx, bsdf_weight);
 
-    // Spawn new ray
+    
     Ray new_ray;
-    // Offset along the side of the surface the new ray is traveling to.
-    // This avoids self-intersections and fixes incorrect glass behavior.
+    
+    
     float origin_sign = (dot(sample.wi, ctx.geometric_normal) >= 0.0f) ? 1.0f : -1.0f;
     new_ray.origin = hit_pos + ctx.geometric_normal * (RAY_EPSILON * origin_sign);
     new_ray.direction = sample.wi;
@@ -282,7 +282,7 @@ __global__ void shade_surface_kernel(
 
     paths.set_ray(path_idx, new_ray);
 
-    // Update flags
+    
     if (sample.is_specular) {
         paths.flags[path_idx] |= PATH_SPECULAR;
     } else {
@@ -291,14 +291,14 @@ __global__ void shade_surface_kernel(
 
     paths.depth[path_idx] = depth + 1;
 
-    // Add to next iteration queue
+    
     unsigned int slot = atomicAdd(next_count, 1);
     next_paths[slot] = path_idx;
 }
 
-// =============================================================================
-// Shadow Ray Kernel (for explicit light sampling)
-// =============================================================================
+
+
+
 
 __global__ void trace_shadow_kernel(
     PathStateView paths,
@@ -325,15 +325,15 @@ __global__ void trace_shadow_kernel(
     bool occluded = traverse_bvh_shadow(bvh_nodes, triangles, shadow_ray);
 
     if (!occluded) {
-        // Add light contribution
+        
         float3 contribution = shadow_contributions[idx];
         paths.add_radiance(path_idx, contribution);
     }
 }
 
-// =============================================================================
-// Accumulate Results to Framebuffer
-// =============================================================================
+
+
+
 
 __global__ void accumulate_kernel(
     const PathStateView paths,
@@ -351,13 +351,13 @@ __global__ void accumulate_kernel(
 
     float3 radiance = paths.get_radiance(idx);
 
-    // Clamp fireflies
+    
     float lum = luminance(radiance);
     if (lum > 100.0f) {
         radiance = radiance * (100.0f / lum);
     }
 
-    // Accumulate
+    
     float4 old_value = accumulation_buffer[pixel_idx];
     int old_count = sample_count[pixel_idx];
 
@@ -375,9 +375,9 @@ __global__ void accumulate_kernel(
     sample_count[pixel_idx] = old_count + 1;
 }
 
-// =============================================================================
-// Spectral to RGB Conversion Kernel
-// =============================================================================
+
+
+
 
 __global__ void spectral_to_rgb_kernel(
     const PathStateView paths,
@@ -393,7 +393,7 @@ __global__ void spectral_to_rgb_kernel(
     int y = paths.pixel_y[idx];
     int pixel_idx = y * width + x;
 
-    // Gather spectral radiance
+    
     SpectralRadiance radiance;
     SpectralSample wavelengths;
     for (int i = 0; i < NUM_WAVELENGTHS; i++) {
@@ -401,19 +401,19 @@ __global__ void spectral_to_rgb_kernel(
         wavelengths.lambda[i] = paths.wavelengths[i][idx];
     }
 
-    // Convert to RGB
+    
     float3 rgb = spectral_to_rgb(radiance, wavelengths);
 
-    // Clamp negative values (can happen due to spectral mismatch)
+    
     rgb = max(rgb, make_float3(0.0f));
 
-    // Clamp fireflies
+    
     float lum = luminance(rgb);
     if (lum > 100.0f) {
         rgb = rgb * (100.0f / lum);
     }
 
-    // Accumulate
+    
     float4 old_value = accumulation_buffer[pixel_idx];
     int old_count = sample_count[pixel_idx];
 
@@ -431,12 +431,12 @@ __global__ void spectral_to_rgb_kernel(
     sample_count[pixel_idx] = old_count + 1;
 }
 
-// =============================================================================
-// Tonemap and Convert to Display Kernel
-// =============================================================================
+
+
+
 
 __device__ float3 aces_tonemap(float3 x) {
-    // ACES filmic tone mapping
+    
     const float a = 2.51f;
     const float b = 0.03f;
     const float c = 2.43f;
@@ -461,16 +461,16 @@ __global__ void tonemap_kernel(
     float4 hdr = accumulation_buffer[pixel_idx];
     float3 color = make_float3(hdr.x, hdr.y, hdr.z);
 
-    // Exposure
+    
     color = color * exposure;
 
-    // Tonemap
+    
     color = aces_tonemap(color);
 
-    // Gamma correction (linear to sRGB)
+    
     color = linear_to_srgb(color);
 
-    // Convert to 8-bit
+    
     display_buffer[pixel_idx] = make_uchar4(
         static_cast<unsigned char>(color.x * 255.0f + 0.5f),
         static_cast<unsigned char>(color.y * 255.0f + 0.5f),
@@ -479,9 +479,9 @@ __global__ void tonemap_kernel(
     );
 }
 
-// =============================================================================
-// Host-Callable Wrapper Functions for Cross-TU Kernel Launches
-// =============================================================================
+
+
+
 
 void launch_generate_rays(
     PathStateView paths,
@@ -563,4 +563,4 @@ void launch_tonemap(
     tonemap_kernel<<<grid, block>>>(accumulation_buffer, display_buffer, width, height, exposure);
 }
 
-} // namespace lumina
+} 

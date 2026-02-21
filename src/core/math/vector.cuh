@@ -5,11 +5,11 @@
 
 namespace lumina {
 
-// =============================================================================
-// Float3 Vector Operations
-// =============================================================================
 
-// Wrap CUDA's make_float3 to allow consistent usage within lumina namespace
+
+
+
+
 __host__ __device__ inline float3 make_float3(float x, float y, float z) {
     return ::make_float3(x, y, z);
 }
@@ -132,12 +132,12 @@ __host__ __device__ inline float3 clamp(const float3& v, float lo, float hi) {
     );
 }
 
-// Scalar clamp
+
 __host__ __device__ inline float clamp(float v, float lo, float hi) {
     return fminf(fmaxf(v, lo), hi);
 }
 
-// Scalar min/max for int
+
 __host__ __device__ inline int min_int(int a, int b) {
     return (a < b) ? a : b;
 }
@@ -175,9 +175,9 @@ __host__ __device__ inline float3 faceforward(const float3& n, const float3& v) 
     return (dot(n, v) < 0.0f) ? n : -n;
 }
 
-// =============================================================================
-// Float4 Vector Operations
-// =============================================================================
+
+
+
 
 __host__ __device__ inline float4 make_float4(float x, float y, float z, float w) {
     return ::make_float4(x, y, z, w);
@@ -229,9 +229,9 @@ __host__ __device__ inline float dot(const float4& a, const float4& b) {
     return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
 }
 
-// =============================================================================
-// Float2 Vector Operations
-// =============================================================================
+
+
+
 
 __host__ __device__ inline float2 make_float2(float x, float y) {
     return ::make_float2(x, y);
@@ -261,9 +261,9 @@ __host__ __device__ inline float2 operator/(const float2& v, float s) {
     return make_float2(v.x / s, v.y / s);
 }
 
-// =============================================================================
-// Integer Vector Operations
-// =============================================================================
+
+
+
 
 __host__ __device__ inline int3 make_int3(int x, int y, int z) {
     return ::make_int3(x, y, z);
@@ -273,9 +273,9 @@ __host__ __device__ inline uint3 make_uint3(unsigned int x, unsigned int y, unsi
     return ::make_uint3(x, y, z);
 }
 
-// =============================================================================
-// Constants
-// =============================================================================
+
+
+
 
 constexpr float PI = 3.14159265358979323846f;
 constexpr float TWO_PI = 6.28318530717958647692f;
@@ -288,9 +288,9 @@ constexpr float EPSILON = 1e-6f;
 constexpr float RAY_EPSILON = 1e-4f;
 constexpr float INFINITY_F = 1e30f;
 
-// =============================================================================
-// Coordinate Frame / Basis
-// =============================================================================
+
+
+
 
 struct Frame {
     float3 tangent;
@@ -300,7 +300,7 @@ struct Frame {
     __host__ __device__ Frame() {}
 
     __host__ __device__ Frame(const float3& n) : normal(n) {
-        // Frisvad's method for building orthonormal basis
+        
         if (n.z < -0.9999999f) {
             tangent = make_float3(0.0f, -1.0f, 0.0f);
             bitangent = make_float3(-1.0f, 0.0f, 0.0f);
@@ -321,9 +321,9 @@ struct Frame {
     }
 };
 
-// =============================================================================
-// Ray Structure
-// =============================================================================
+
+
+
 
 struct Ray {
     float3 origin;
@@ -341,4 +341,4 @@ struct Ray {
     }
 };
 
-} // namespace lumina
+} 

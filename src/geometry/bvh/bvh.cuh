@@ -7,16 +7,16 @@
 
 namespace lumina {
 
-// =============================================================================
-// BVH Node Structure
-// =============================================================================
 
-// Compact BVH node (32 bytes aligned for coalesced access)
+
+
+
+
 struct BVHNode {
     float3 bounds_min;
-    uint32_t left_or_first;   // For internal: left child index. For leaf: first primitive index
+    uint32_t left_or_first;   
     float3 bounds_max;
-    uint32_t prim_count;      // 0 for internal nodes, >0 for leaf nodes
+    uint32_t prim_count;      
 
     __host__ __device__ bool is_leaf() const {
         return prim_count > 0;
@@ -44,9 +44,9 @@ struct BVHNode {
     }
 };
 
-// =============================================================================
-// BVH Structure (Host-side management)
-// =============================================================================
+
+
+
 
 class BVH {
 public:
@@ -54,7 +54,7 @@ public:
 
     void build(const Triangle* triangles, int count);
 
-    // Accessors for device pointers
+    
     const BVHNode* nodes() const { return nodes_.data(); }
     const Triangle* primitives() const { return primitives_.data(); }
     const int* primitive_indices() const { return prim_indices_.data(); }
@@ -78,9 +78,9 @@ private:
     AABB world_bounds_;
 };
 
-// =============================================================================
-// Device-side BVH Traversal
-// =============================================================================
+
+
+
 
 struct BVHTraversalState {
     static constexpr int MAX_STACK_SIZE = 64;
@@ -89,7 +89,7 @@ struct BVHTraversalState {
 
     __device__ void init() {
         stack_ptr = 0;
-        push(0);  // Start with root node
+        push(0);  
     }
 
     __device__ void push(int node_idx) {
@@ -105,7 +105,7 @@ struct BVHTraversalState {
     }
 };
 
-// Basic BVH traversal
+
 __device__ inline bool traverse_bvh(
     const BVHNode* __restrict__ nodes,
     const Triangle* __restrict__ primitives,
@@ -129,14 +129,14 @@ __device__ inline bool traverse_bvh(
         int node_idx = state.pop();
         const BVHNode& node = nodes[node_idx];
 
-        // Test ray against node bounds
+        
         AABB box = node.bounds();
         if (!box.intersect_fast(ray.origin, inv_dir, ray.t_min, closest_t)) {
             continue;
         }
 
         if (node.is_leaf()) {
-            // Test against all primitives in leaf
+            
             for (uint32_t i = 0; i < node.prim_count; i++) {
                 const Triangle& tri = primitives[node.first_prim() + i];
                 float t, u, v;
@@ -151,8 +151,8 @@ __device__ inline bool traverse_bvh(
                 }
             }
         } else {
-            // Push children in order (far child first for stack-based traversal)
-            // This gives us front-to-back traversal
+            
+            
             int axis = box.largest_axis();
             bool dir_neg = false;
             if (axis == 0) dir_neg = dir_is_neg.x;
@@ -172,7 +172,7 @@ __device__ inline bool traverse_bvh(
     return hit;
 }
 
-// Shadow ray traversal (any-hit)
+
 __device__ inline bool traverse_bvh_shadow(
     const BVHNode* __restrict__ nodes,
     const Triangle* __restrict__ primitives,
@@ -197,7 +197,7 @@ __device__ inline bool traverse_bvh_shadow(
                 const Triangle& tri = primitives[node.first_prim() + i];
                 float t, u, v;
                 if (tri.intersect(ray, t, u, v)) {
-                    return true;  // Found occlusion
+                    return true;  
                 }
             }
         } else {
@@ -206,14 +206,14 @@ __device__ inline bool traverse_bvh_shadow(
         }
     }
 
-    return false;  // No occlusion
+    return false;  
 }
 
-// =============================================================================
-// Morton Code Computation for LBVH
-// =============================================================================
 
-// Expand bits for Morton code computation
+
+
+
+
 __host__ __device__ inline uint32_t expand_bits(uint32_t v) {
     v = (v * 0x00010001u) & 0xFF0000FFu;
     v = (v * 0x00000101u) & 0x0F00F00Fu;
@@ -222,7 +222,7 @@ __host__ __device__ inline uint32_t expand_bits(uint32_t v) {
     return v;
 }
 
-// Compute 30-bit Morton code for 3D point in [0,1]^3
+
 __host__ __device__ inline uint32_t morton_code_3d(float3 p) {
     p = clamp(p * 1024.0f, 0.0f, 1023.0f);
     uint32_t x = expand_bits(static_cast<uint32_t>(p.x));
@@ -231,7 +231,7 @@ __host__ __device__ inline uint32_t morton_code_3d(float3 p) {
     return (z << 2) | (y << 1) | x;
 }
 
-// Count leading zeros (device version uses intrinsic, host uses fallback)
+
 __device__ inline int clz_device(uint32_t x) {
     return __clz(x);
 }
@@ -247,7 +247,7 @@ __host__ inline int clz_host(uint32_t x) {
     return n;
 }
 
-// Find highest differing bit between two sorted Morton codes
+
 __device__ inline int find_split(uint32_t* morton_codes, int first, int last) {
     uint32_t first_code = morton_codes[first];
     uint32_t last_code = morton_codes[last];
@@ -277,4 +277,4 @@ __device__ inline int find_split(uint32_t* morton_codes, int first, int last) {
     return split;
 }
 
-} // namespace lumina
+} 

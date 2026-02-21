@@ -8,9 +8,9 @@
 
 using namespace lumina;
 
-// =============================================================================
-// Main
-// =============================================================================
+
+
+
 
 void print_cuda_info() {
     int device_count = 0;
@@ -58,11 +58,11 @@ int main(int argc, char** argv) {
 
     std::cout << "\nResolution: " << width << "x" << height << std::endl;
 
-    // Create scene
+    
     std::cout << "\nBuilding scene..." << std::endl;
     Scene scene = create_demo_scene();
 
-    // Create window first so CUDA/GL interop registers against an active GL context.
+    
     RenderWindow window(width, height, "Lumina Path Tracer");
 
     if (!window.is_valid()) {
@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Create renderer
+    
     std::cout << "Initializing renderer..." << std::endl;
     InteractiveRenderer renderer(width, height);
 

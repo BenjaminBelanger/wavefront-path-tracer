@@ -32,19 +32,19 @@ void add_box(Scene& scene, const float3& center, const float3& size, float angle
         rotate(::make_float3(center.x - hx, center.y + hy, center.z + hz)),
     };
 
-    // Front
+    
     scene.add_triangle(Triangle(corners[0], corners[1], corners[5], mat_id));
     scene.add_triangle(Triangle(corners[0], corners[5], corners[4], mat_id));
-    // Back
+    
     scene.add_triangle(Triangle(corners[2], corners[3], corners[7], mat_id));
     scene.add_triangle(Triangle(corners[2], corners[7], corners[6], mat_id));
-    // Left
+    
     scene.add_triangle(Triangle(corners[3], corners[0], corners[4], mat_id));
     scene.add_triangle(Triangle(corners[3], corners[4], corners[7], mat_id));
-    // Right
+    
     scene.add_triangle(Triangle(corners[1], corners[2], corners[6], mat_id));
     scene.add_triangle(Triangle(corners[1], corners[6], corners[5], mat_id));
-    // Top
+    
     scene.add_triangle(Triangle(corners[4], corners[5], corners[6], mat_id));
     scene.add_triangle(Triangle(corners[4], corners[6], corners[7], mat_id));
 }
@@ -239,4 +239,4 @@ void add_octahedron(Scene& scene, const float3& center, float radius, float angl
     scene.add_triangle(Triangle(bottom, m0, m3, mat_id));
 }
 
-} // namespace lumina::scene_shapes
+} 

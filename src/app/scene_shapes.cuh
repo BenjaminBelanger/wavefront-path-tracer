@@ -19,4 +19,4 @@ void add_torus(
 );
 void add_octahedron(Scene& scene, const float3& center, float radius, float angle, int mat_id);
 
-} // namespace lumina::scene_shapes
+} 

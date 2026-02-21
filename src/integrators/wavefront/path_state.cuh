@@ -7,14 +7,14 @@
 
 namespace lumina {
 
-// =============================================================================
-// Path State for Wavefront Path Tracer (SoA Layout)
-// =============================================================================
 
-// Maximum path depth
+
+
+
+
 constexpr int MAX_PATH_DEPTH = 16;
 
-// Path flags
+
 enum PathFlags : uint32_t {
     PATH_ACTIVE = 1 << 0,
     PATH_SPECULAR = 1 << 1,
@@ -22,13 +22,13 @@ enum PathFlags : uint32_t {
     PATH_HIT_LIGHT = 1 << 3,
 };
 
-// Per-path state stored in SoA format for coalesced access
+
 struct PathStateSoA {
-    // Pixel coordinates
+    
     DeviceBuffer<int> pixel_x;
     DeviceBuffer<int> pixel_y;
 
-    // Current ray
+    
     DeviceBuffer<float> ray_origin_x;
     DeviceBuffer<float> ray_origin_y;
     DeviceBuffer<float> ray_origin_z;
@@ -36,25 +36,25 @@ struct PathStateSoA {
     DeviceBuffer<float> ray_dir_y;
     DeviceBuffer<float> ray_dir_z;
 
-    // Path throughput (accumulated BSDF * cos / pdf)
+    
     DeviceBuffer<float> throughput_x;
     DeviceBuffer<float> throughput_y;
     DeviceBuffer<float> throughput_z;
 
-    // Accumulated radiance
+    
     DeviceBuffer<float> radiance_x;
     DeviceBuffer<float> radiance_y;
     DeviceBuffer<float> radiance_z;
 
-    // Path bookkeeping
+    
     DeviceBuffer<int> depth;
     DeviceBuffer<uint32_t> flags;
     DeviceBuffer<int> material_id;
 
-    // RNG state
+    
     DeviceBuffer<PCG32> rng;
 
-    // Spectral data (for hero wavelength rendering)
+    
     DeviceBuffer<float> wavelengths[NUM_WAVELENGTHS];
     DeviceBuffer<float> spectral_throughput[NUM_WAVELENGTHS];
     DeviceBuffer<float> spectral_radiance[NUM_WAVELENGTHS];
@@ -94,7 +94,7 @@ struct PathStateSoA {
     size_t size() const { return pixel_x.size(); }
 };
 
-// Device-side view for PathStateSoA
+
 struct PathStateView {
     int* __restrict__ pixel_x;
     int* __restrict__ pixel_y;
@@ -120,7 +120,7 @@ struct PathStateView {
 
     PCG32* __restrict__ rng;
 
-    // Spectral
+    
     float* __restrict__ wavelengths[NUM_WAVELENGTHS];
     float* __restrict__ spectral_throughput[NUM_WAVELENGTHS];
     float* __restrict__ spectral_radiance[NUM_WAVELENGTHS];
@@ -240,9 +240,9 @@ inline PathStateView make_view(PathStateSoA& state) {
     return view;
 }
 
-// =============================================================================
-// Hit Information SoA
-// =============================================================================
+
+
+
 
 struct HitInfoSoA {
     DeviceBuffer<float> t;
@@ -251,7 +251,7 @@ struct HitInfoSoA {
     DeviceBuffer<float> u;
     DeviceBuffer<float> v;
 
-    // Shading data
+    
     DeviceBuffer<float> pos_x, pos_y, pos_z;
     DeviceBuffer<float> normal_x, normal_y, normal_z;
     DeviceBuffer<float> geom_normal_x, geom_normal_y, geom_normal_z;
@@ -328,4 +328,4 @@ inline HitInfoView make_view(HitInfoSoA& hits) {
     return view;
 }
 
-} // namespace lumina
+} 

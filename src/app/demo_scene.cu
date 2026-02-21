@@ -8,7 +8,7 @@ namespace lumina {
 Scene create_demo_scene() {
     Scene scene;
 
-    // Materials
+    
     int white_diffuse = scene.add_material(Material::diffuse(::make_float3(0.73f, 0.73f, 0.73f)));
     int red_diffuse = scene.add_material(Material::diffuse(::make_float3(0.65f, 0.05f, 0.05f)));
     int green_diffuse = scene.add_material(Material::diffuse(::make_float3(0.12f, 0.45f, 0.15f)));
@@ -25,10 +25,10 @@ Scene create_demo_scene() {
     int neon_pink_light = scene.add_material(Material::emissive(::make_float3(1.0f, 0.2f, 0.7f), 3.5f));
     int electric_blue_light = scene.add_material(Material::emissive(::make_float3(0.2f, 0.75f, 1.0f), 3.0f));
 
-    // Cornell box dimensions
+    
     float box_size = 7.0f;
 
-    // Floor
+    
     scene.add_triangle(Triangle(
         ::make_float3(0.0f, 0.0f, 0.0f),
         ::make_float3(box_size, 0.0f, 0.0f),
@@ -42,7 +42,7 @@ Scene create_demo_scene() {
         white_diffuse
     ));
 
-    // Ceiling
+    
     scene.add_triangle(Triangle(
         ::make_float3(0.0f, box_size, 0.0f),
         ::make_float3(0.0f, box_size, box_size),
@@ -56,7 +56,7 @@ Scene create_demo_scene() {
         white_diffuse
     ));
 
-    // Back wall
+    
     scene.add_triangle(Triangle(
         ::make_float3(0.0f, 0.0f, box_size),
         ::make_float3(box_size, 0.0f, box_size),
@@ -70,7 +70,7 @@ Scene create_demo_scene() {
         white_diffuse
     ));
 
-    // Left wall (red)
+    
     scene.add_triangle(Triangle(
         ::make_float3(0.0f, 0.0f, 0.0f),
         ::make_float3(0.0f, 0.0f, box_size),
@@ -84,7 +84,7 @@ Scene create_demo_scene() {
         red_diffuse
     ));
 
-    // Right wall (green)
+    
     scene.add_triangle(Triangle(
         ::make_float3(box_size, 0.0f, 0.0f),
         ::make_float3(box_size, box_size, 0.0f),
@@ -98,7 +98,7 @@ Scene create_demo_scene() {
         green_diffuse
     ));
 
-    // Light on ceiling
+    
     float light_size = 2.0f;
     float light_y = box_size - 0.01f;
     float light_center = box_size / 2.0f;
@@ -115,7 +115,7 @@ Scene create_demo_scene() {
         light_mat
     ));
 
-    // Neon accent panels on the back wall
+    
     scene.add_triangle(Triangle(
         ::make_float3(1.0f, 2.0f, box_size - 0.01f),
         ::make_float3(2.1f, 2.0f, box_size - 0.01f),
@@ -141,26 +141,26 @@ Scene create_demo_scene() {
         electric_blue_light
     ));
 
-    // Main hero objects
+    
     scene_shapes::add_uv_sphere(scene, ::make_float3(1.45f, 1.0f, 4.8f), 1.0f, mirror_mat, 24);
     scene_shapes::add_uv_sphere(scene, ::make_float3(3.45f, 0.9f, 2.35f), 0.9f, chrome_mat, 24);
     scene_shapes::add_uv_sphere(scene, ::make_float3(5.35f, 0.75f, 4.65f), 0.75f, gold_mat, 24);
     scene_shapes::add_uv_sphere(scene, ::make_float3(1.9f, 0.42f, 1.65f), 0.42f, velvet_violet, 16);
 
-    // New playful shapes
+    
     scene_shapes::add_pyramid(scene, ::make_float3(5.45f, 0.0f, 1.95f), 1.0f, 1.35f, 0.42f, coral_diffuse);
     scene_shapes::add_octahedron(scene, ::make_float3(2.55f, 1.1f, 3.25f), 0.62f, 0.5f, mango_diffuse);
     scene_shapes::add_torus(scene, ::make_float3(4.05f, 1.65f, 3.8f), 0.78f, 0.24f, 0.35f, pearl_metal, 24, 12);
 
-    // Accent cubes (separated and more visible from the default camera)
+    
     scene_shapes::add_box(scene, ::make_float3(6.25f, 0.45f, 3.6f), ::make_float3(0.9f, 0.9f, 0.9f), 0.12f, obsidian_metal);
     scene_shapes::add_box(scene, ::make_float3(4.25f, 0.36f, 4.35f), ::make_float3(0.72f, 0.72f, 0.72f), -0.5f, rose_gold_metal);
 
-    // Keep global scene scaling as a single tuning knob.
+    
     const float scene_scale = 1.0f;
     scene.scale_geometry(scene_scale, ::make_float3(box_size * 0.5f, box_size * 0.5f, box_size * 0.5f));
 
-    // Build BVH
+    
     scene.build();
 
     printf("Scene created: %d triangles, %d materials\n",
@@ -169,4 +169,4 @@ Scene create_demo_scene() {
     return scene;
 }
 
-} // namespace lumina
+} 

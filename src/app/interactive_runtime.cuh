@@ -66,4 +66,4 @@ private:
     InteractiveRenderer* renderer_;
 };
 
-} // namespace lumina
+} 

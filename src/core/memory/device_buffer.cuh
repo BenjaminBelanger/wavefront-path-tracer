@@ -6,9 +6,9 @@
 
 namespace lumina {
 
-// =============================================================================
-// RAII Device Memory Buffer
-// =============================================================================
+
+
+
 
 template<typename T>
 class DeviceBuffer {
@@ -23,11 +23,11 @@ public:
         free();
     }
 
-    // Non-copyable
+    
     DeviceBuffer(const DeviceBuffer&) = delete;
     DeviceBuffer& operator=(const DeviceBuffer&) = delete;
 
-    // Movable
+    
     DeviceBuffer(DeviceBuffer&& other) noexcept
         : data_(other.data_), size_(other.size_), capacity_(other.capacity_) {
         other.data_ = nullptr;
@@ -73,7 +73,7 @@ public:
         }
     }
 
-    // Upload from host to device
+    
     void upload(const T* host_data, size_t count) {
         resize(count);
         cudaMemcpy(data_, host_data, count * sizeof(T), cudaMemcpyHostToDevice);
@@ -84,7 +84,7 @@ public:
         cudaMemcpyAsync(data_, host_data, count * sizeof(T), cudaMemcpyHostToDevice, stream);
     }
 
-    // Download from device to host
+    
     void download(T* host_data) const {
         cudaMemcpy(host_data, data_, size_ * sizeof(T), cudaMemcpyDeviceToHost);
     }
@@ -93,7 +93,7 @@ public:
         cudaMemcpyAsync(host_data, data_, size_ * sizeof(T), cudaMemcpyDeviceToHost, stream);
     }
 
-    // Copy from another device buffer
+    
     void copy_from(const DeviceBuffer<T>& other) {
         resize(other.size_);
         cudaMemcpy(data_, other.data_, size_ * sizeof(T), cudaMemcpyDeviceToDevice);
@@ -104,7 +104,7 @@ public:
         cudaMemcpyAsync(data_, other.data_, size_ * sizeof(T), cudaMemcpyDeviceToDevice, stream);
     }
 
-    // Accessors
+    
     T* data() { return data_; }
     const T* data() const { return data_; }
     T* get() { return data_; }
@@ -114,7 +114,7 @@ public:
     size_t bytes() const { return size_ * sizeof(T); }
     bool empty() const { return size_ == 0; }
 
-    // Allow implicit conversion to raw pointer
+    
     operator T*() { return data_; }
     operator const T*() const { return data_; }
 
@@ -124,9 +124,9 @@ private:
     size_t capacity_;
 };
 
-// =============================================================================
-// Pinned (Page-Locked) Host Memory Buffer
-// =============================================================================
+
+
+
 
 template<typename T>
 class PinnedBuffer {
@@ -141,11 +141,11 @@ public:
         free();
     }
 
-    // Non-copyable
+    
     PinnedBuffer(const PinnedBuffer&) = delete;
     PinnedBuffer& operator=(const PinnedBuffer&) = delete;
 
-    // Movable
+    
     PinnedBuffer(PinnedBuffer&& other) noexcept
         : data_(other.data_), size_(other.size_), capacity_(other.capacity_) {
         other.data_ = nullptr;
@@ -204,9 +204,9 @@ private:
     size_t capacity_;
 };
 
-// =============================================================================
-// Managed (Unified) Memory Buffer
-// =============================================================================
+
+
+
 
 template<typename T>
 class ManagedBuffer {
@@ -264,12 +264,12 @@ public:
         }
     }
 
-    // Prefetch to GPU
+    
     void prefetch_to_device(int device = 0, cudaStream_t stream = 0) {
         cudaMemPrefetchAsync(data_, size_ * sizeof(T), device, stream);
     }
 
-    // Prefetch to CPU
+    
     void prefetch_to_host(cudaStream_t stream = 0) {
         cudaMemPrefetchAsync(data_, size_ * sizeof(T), cudaCpuDeviceId, stream);
     }
@@ -292,9 +292,9 @@ private:
     size_t capacity_;
 };
 
-// =============================================================================
-// CUDA Error Checking Utility
-// =============================================================================
+
+
+
 
 #define CUDA_CHECK(call)                                                        \
     do {                                                                        \
@@ -316,9 +316,9 @@ private:
         }                                                                       \
     } while (0)
 
-// =============================================================================
-// Kernel Launch Helpers
-// =============================================================================
+
+
+
 
 inline dim3 compute_grid_size(size_t total_threads, int block_size = 256) {
     return dim3((static_cast<unsigned int>(total_threads) + block_size - 1) / block_size);
@@ -328,4 +328,4 @@ inline dim3 compute_grid_size_2d(int width, int height, int block_x = 16, int bl
     return dim3((width + block_x - 1) / block_x, (height + block_y - 1) / block_y);
 }
 
-} // namespace lumina
+} 

@@ -7,16 +7,16 @@
 
 namespace lumina {
 
-// =============================================================================
-// BSDF Sample Result
-// =============================================================================
+
+
+
 
 struct BSDFSample {
-    float3 wi;          // Sampled incoming direction (in world space)
-    float pdf;          // PDF of sampling this direction
-    float3 f;           // BSDF value f(wo, wi) * |cos(theta_i)|
-    bool is_specular;   // True for delta distributions (mirrors, glass)
-    bool is_transmission; // True for transmitted rays
+    float3 wi;          
+    float pdf;          
+    float3 f;           
+    bool is_specular;   
+    bool is_transmission; 
 
     __host__ __device__ BSDFSample()
         : wi(make_float3(0.0f)), pdf(0.0f), f(make_float3(0.0f))
@@ -27,7 +27,7 @@ struct BSDFSample {
     }
 };
 
-// Spectral version
+
 struct SpectralBSDFSample {
     float3 wi;
     float pdf;
@@ -43,9 +43,9 @@ struct SpectralBSDFSample {
     }
 };
 
-// =============================================================================
-// Material Types
-// =============================================================================
+
+
+
 
 enum class MaterialType : uint32_t {
     Lambert = 0,
@@ -56,37 +56,37 @@ enum class MaterialType : uint32_t {
     COUNT
 };
 
-// =============================================================================
-// Material Descriptor (GPU-friendly)
-// =============================================================================
+
+
+
 
 struct Material {
     MaterialType type;
 
-    // Albedo/base color (RGB)
+    
     float3 albedo;
 
-    // Roughness parameters
-    float roughness;      // Isotropic roughness [0, 1]
-    float anisotropy;     // Anisotropy [-1, 1]
+    
+    float roughness;      
+    float anisotropy;     
 
-    // IOR for dielectrics
+    
     float ior;
 
-    // Metallic parameters
-    float3 eta;           // Complex IOR real part (for conductors)
-    float3 k;             // Complex IOR imaginary part (extinction)
+    
+    float3 eta;           
+    float3 k;             
 
-    // Emission
+    
     float3 emission;
     float emission_strength;
 
-    // Texture indices (-1 = no texture)
+    
     int albedo_tex;
     int roughness_tex;
     int normal_tex;
 
-    // Spectral data indices (-1 = use RGB approximation)
+    
     int spectral_data_idx;
 
     __host__ __device__ Material()
@@ -114,7 +114,7 @@ struct Material {
         return emission * emission_strength;
     }
 
-    // Factory methods
+    
     __host__ static Material diffuse(const float3& color) {
         Material m;
         m.type = MaterialType::Lambert;
@@ -127,7 +127,7 @@ struct Material {
         m.type = MaterialType::Metal;
         m.albedo = color;
         m.roughness = rough;
-        // Use color as F0 for simplified conductor
+        
         m.eta = color;
         m.k = make_float3(1.0f);
         return m;
@@ -152,18 +152,18 @@ struct Material {
     }
 };
 
-// =============================================================================
-// Shading Context
-// =============================================================================
+
+
+
 
 struct ShadingContext {
-    float3 position;     // World-space hit position
-    float3 normal;       // Shading normal (possibly from normal map)
-    float3 geometric_normal;  // True geometric normal
-    float3 wo;           // Outgoing direction (towards camera/previous vertex)
-    float2 uv;           // Texture coordinates
+    float3 position;     
+    float3 normal;       
+    float3 geometric_normal;  
+    float3 wo;           
+    float2 uv;           
 
-    Frame frame;         // Local coordinate frame from shading normal
+    Frame frame;         
 
     __host__ __device__ ShadingContext() {}
 
@@ -179,7 +179,7 @@ struct ShadingContext {
         return frame.to_world(w);
     }
 
-    // Ensure wo is on correct side of surface
+    
     __host__ __device__ void ensure_correct_orientation() {
         if (dot(wo, geometric_normal) < 0.0f) {
             geometric_normal = -geometric_normal;
@@ -191,4 +191,4 @@ struct ShadingContext {
     }
 };
 
-} // namespace lumina
+} 

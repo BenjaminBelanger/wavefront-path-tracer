@@ -5,44 +5,44 @@
 
 namespace lumina {
 
-// =============================================================================
-// Lambertian (Diffuse) BSDF
-// =============================================================================
 
-// f(wo, wi) = albedo / PI
-// PDF = cos(theta) / PI  (cosine-weighted hemisphere sampling)
+
+
+
+
+
 
 struct LambertBSDF {
     float3 albedo;
 
     __host__ __device__ LambertBSDF(const float3& color) : albedo(color) {}
 
-    // Evaluate BSDF (without cosine term)
+    
     __host__ __device__ float3 evaluate(const float3& wo_local, const float3& wi_local) const {
-        // Both directions should be in same hemisphere
+        
         if (wo_local.z <= 0.0f || wi_local.z <= 0.0f) {
             return make_float3(0.0f);
         }
         return albedo * INV_PI;
     }
 
-    // Sample incoming direction
+    
     __host__ __device__ BSDFSample sample(const float3& wo_local, float u1, float u2) const {
         BSDFSample sample;
 
-        // Check that we're on the correct side
+        
         if (wo_local.z <= 0.0f) {
             return sample;
         }
 
-        // Cosine-weighted hemisphere sampling
+        
         sample.wi = sample_hemisphere_cosine(u1, u2);
         sample.pdf = pdf_hemisphere_cosine(sample.wi.z);
 
-        // f * |cos(theta)| = (albedo / PI) * cos(theta)
-        // But we sampled with PDF = cos(theta) / PI
-        // So f * |cos| / PDF = albedo
-        sample.f = albedo * sample.wi.z;  // Include cosine for proper weighting
+        
+        
+        
+        sample.f = albedo * sample.wi.z;  
 
         sample.is_specular = false;
         sample.is_transmission = false;
@@ -50,7 +50,7 @@ struct LambertBSDF {
         return sample;
     }
 
-    // PDF for a given direction
+    
     __host__ __device__ float pdf(const float3& wo_local, const float3& wi_local) const {
         if (wo_local.z <= 0.0f || wi_local.z <= 0.0f) {
             return 0.0f;
@@ -59,9 +59,9 @@ struct LambertBSDF {
     }
 };
 
-// =============================================================================
-// Spectral Lambertian BSDF
-// =============================================================================
+
+
+
 
 struct SpectralLambertBSDF {
     SpectralRadiance albedo;
@@ -99,14 +99,14 @@ struct SpectralLambertBSDF {
     }
 };
 
-// =============================================================================
-// Oren-Nayar Diffuse (Rough Diffuse)
-// =============================================================================
+
+
+
 
 struct OrenNayarBSDF {
     float3 albedo;
-    float sigma;  // Surface roughness (standard deviation of angle in radians)
-    float A, B;   // Precomputed coefficients
+    float sigma;  
+    float A, B;   
 
     __host__ __device__ OrenNayarBSDF(const float3& color, float roughness)
         : albedo(color), sigma(roughness) {
@@ -123,7 +123,7 @@ struct OrenNayarBSDF {
         float sin_theta_i = sqrtf(fmaxf(0.0f, 1.0f - wi_local.z * wi_local.z));
         float sin_theta_o = sqrtf(fmaxf(0.0f, 1.0f - wo_local.z * wo_local.z));
 
-        // Compute cos(phi_i - phi_o)
+        
         float max_cos = 0.0f;
         if (sin_theta_i > 1e-4f && sin_theta_o > 1e-4f) {
             float cos_phi_diff = (wi_local.x * wo_local.x + wi_local.y * wo_local.y) /
@@ -131,7 +131,7 @@ struct OrenNayarBSDF {
             max_cos = fmaxf(0.0f, cos_phi_diff);
         }
 
-        // Compute sin(alpha) * tan(beta)
+        
         float sin_alpha, tan_beta;
         if (wi_local.z > wo_local.z) {
             sin_alpha = sin_theta_o;
@@ -151,7 +151,7 @@ struct OrenNayarBSDF {
             return sample;
         }
 
-        // Use cosine-weighted sampling (not optimal but simple)
+        
         sample.wi = sample_hemisphere_cosine(u1, u2);
         sample.pdf = pdf_hemisphere_cosine(sample.wi.z);
         sample.f = evaluate(wo_local, sample.wi) * sample.wi.z;
@@ -169,9 +169,9 @@ struct OrenNayarBSDF {
     }
 };
 
-// =============================================================================
-// Helper: Dispatch BSDF evaluation based on material type
-// =============================================================================
+
+
+
 
 __device__ inline BSDFSample sample_bsdf(
     const Material& material,
@@ -190,18 +190,18 @@ __device__ inline BSDFSample sample_bsdf(
             return sample;
         }
         case MaterialType::Metal: {
-            // Metallic reflection with optional roughness
+            
             BSDFSample sample;
             if (wo_local.z <= 0.0f) return sample;
 
             if (material.roughness < 0.01f) {
-                // Perfect mirror
+                
                 sample.wi = make_float3(-wo_local.x, -wo_local.y, wo_local.z);
                 sample.f = material.albedo * wo_local.z;
                 sample.pdf = 1.0f;
                 sample.is_specular = true;
             } else {
-                // Rough metal using GGX
+                
                 float alpha = material.roughness * material.roughness;
                 float3 h = ggx_sample_vndf(wo_local, alpha, u1, u2);
                 sample.wi = reflect(-wo_local, h);
@@ -222,7 +222,7 @@ __device__ inline BSDFSample sample_bsdf(
             return sample;
         }
         case MaterialType::Dielectric: {
-            // Glass with refraction
+            
             BSDFSample sample;
             if (wo_local.z == 0.0f) return sample;
 
@@ -233,20 +233,20 @@ __device__ inline BSDFSample sample_bsdf(
             float cos_theta = fabsf(wo_local.z);
             float F = fresnel_dielectric(cos_theta, eta);
 
-            // Choose reflect or refract
+            
             if (u1 < F) {
-                // Reflect
+                
                 sample.wi = make_float3(-wo_local.x, -wo_local.y, wo_local.z);
                 sample.f = make_float3(1.0f) * fabsf(sample.wi.z);
                 sample.pdf = F;
                 sample.is_specular = true;
                 sample.is_transmission = false;
             } else {
-                // Refract
+                
                 float3 refracted;
                 float3 wo_n = entering ? wo_local : -wo_local;
                 if (!refract(wo_n, n, eta, refracted)) {
-                    // Total internal reflection
+                    
                     sample.wi = make_float3(-wo_local.x, -wo_local.y, wo_local.z);
                     sample.f = make_float3(1.0f) * fabsf(sample.wi.z);
                     sample.pdf = 1.0f;
@@ -254,7 +254,7 @@ __device__ inline BSDFSample sample_bsdf(
                     sample.is_transmission = false;
                 } else {
                     sample.wi = entering ? refracted : -refracted;
-                    // Account for solid angle compression
+                    
                     sample.f = make_float3(eta * eta) * fabsf(sample.wi.z);
                     sample.pdf = 1.0f - F;
                     sample.is_specular = true;
@@ -267,7 +267,7 @@ __device__ inline BSDFSample sample_bsdf(
             return sample;
         }
         default: {
-            // Fallback to Lambert
+            
             LambertBSDF bsdf(material.albedo);
             BSDFSample sample = bsdf.sample(wo_local, u1, u2);
             if (sample.is_valid()) {
@@ -318,4 +318,4 @@ __device__ inline float pdf_bsdf(
     }
 }
 
-} // namespace lumina
+} 
