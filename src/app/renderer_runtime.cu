@@ -34,7 +34,9 @@ namespace lumina
         const HitInfoView &hits,
         const int *active_paths,
         const unsigned int *active_count_ptr,
-        int max_threads);
+        int max_threads,
+        cudaTextureObject_t env_map,
+        float env_intensity);
 
     void launch_shade_surface(
         PathStateView paths,
@@ -79,8 +81,11 @@ namespace lumina
         DeviceBuffer<int> sample_count;
         DeviceBuffer<int> initial_active;
 
+        cudaTextureObject_t env_map;
+        float env_intensity;
+
         Impl(int width_in, int height_in)
-            : width(width_in), height(height_in), num_pixels(width_in * height_in), frame_number(0), total_samples(0), exposure(0.06f), max_depth(8)
+            : width(width_in), height(height_in), num_pixels(width_in * height_in), frame_number(0), total_samples(0), exposure(0.06f), max_depth(8), env_map(0), env_intensity(1.0f)
         {
 
             path_state.resize(num_pixels);
@@ -132,6 +137,9 @@ namespace lumina
 
     void InteractiveRenderer::render_frame(const Camera &camera, const Scene &scene)
     {
+        impl_->env_map = scene.environment_map();
+        impl_->env_intensity = scene.environment_intensity();
+
         PathStateView paths = make_view(impl_->path_state);
         HitInfoView hits = make_view(impl_->hit_info);
 
@@ -152,7 +160,8 @@ namespace lumina
             CUDA_CHECK_LAST();
 
             launch_shade_miss(paths, hits, impl_->work_queues.active_paths(),
-                              impl_->work_queues.active_count_ptr(), impl_->num_pixels);
+                              impl_->work_queues.active_count_ptr(), impl_->num_pixels,
+                              impl_->env_map, impl_->env_intensity);
             CUDA_CHECK_LAST();
 
             CUDA_CHECK(cudaMemset(impl_->work_queues.next_count_ptr(), 0, sizeof(unsigned int)));

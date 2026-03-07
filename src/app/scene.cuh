@@ -127,8 +127,96 @@ namespace lumina
             lights_.push_back(light);
         }
 
+        void add_default_lighting()
+        {
+            if (triangles_.empty())
+                return;
+
+            for (const auto &mat : materials_)
+            {
+                if (mat.is_emissive())
+                    return;
+            }
+
+            AABB bounds;
+            for (const auto &tri : triangles_)
+            {
+                bounds.expand(tri.v0);
+                bounds.expand(tri.v1);
+                bounds.expand(tri.v2);
+            }
+
+            if (!bounds.is_valid())
+                return;
+
+            float3 center = bounds.center();
+            float3 ext = bounds.extent();
+            float diag = length(ext);
+
+            float key_size = diag * 0.3f;
+            float fill_size = diag * 0.45f;
+            float rim_size = diag * 0.3f;
+            float hs;
+
+            int key_mat = add_material(Material::emissive(make_float3(1.0f, 0.95f, 0.85f), 12.0f));
+            float key_y = bounds.max_bound.y + ext.y * 0.5f;
+            float key_z = center.z - ext.z * 0.3f;
+            hs = key_size * 0.5f;
+            add_triangle(Triangle(
+                make_float3(center.x - hs, key_y, key_z - hs),
+                make_float3(center.x + hs, key_y, key_z - hs),
+                make_float3(center.x + hs, key_y, key_z + hs),
+                key_mat));
+            add_triangle(Triangle(
+                make_float3(center.x - hs, key_y, key_z - hs),
+                make_float3(center.x + hs, key_y, key_z + hs),
+                make_float3(center.x - hs, key_y, key_z + hs),
+                key_mat));
+
+            int fill_mat = add_material(Material::emissive(make_float3(0.8f, 0.85f, 1.0f), 4.0f));
+            float fill_y = bounds.min_bound.y - ext.y * 0.5f;
+            hs = fill_size * 0.5f;
+            add_triangle(Triangle(
+                make_float3(center.x - hs, fill_y, center.z - hs),
+                make_float3(center.x + hs, fill_y, center.z + hs),
+                make_float3(center.x + hs, fill_y, center.z - hs),
+                fill_mat));
+            add_triangle(Triangle(
+                make_float3(center.x - hs, fill_y, center.z - hs),
+                make_float3(center.x - hs, fill_y, center.z + hs),
+                make_float3(center.x + hs, fill_y, center.z + hs),
+                fill_mat));
+
+            int rim_mat = add_material(Material::emissive(make_float3(1.0f), 6.0f));
+            float rim_z = bounds.max_bound.z + ext.z * 0.5f;
+            float rim_y = center.y + ext.y * 0.3f;
+            hs = rim_size * 0.5f;
+            add_triangle(Triangle(
+                make_float3(center.x - hs, rim_y - hs, rim_z),
+                make_float3(center.x + hs, rim_y - hs, rim_z),
+                make_float3(center.x + hs, rim_y + hs, rim_z),
+                rim_mat));
+            add_triangle(Triangle(
+                make_float3(center.x - hs, rim_y - hs, rim_z),
+                make_float3(center.x + hs, rim_y + hs, rim_z),
+                make_float3(center.x - hs, rim_y + hs, rim_z),
+                rim_mat));
+        }
+
         TextureManager &texture_manager() { return texture_manager_; }
         const cudaTextureObject_t *textures() const { return texture_manager_.device_textures(); }
+
+        bool set_environment_map(const std::string &filepath)
+        {
+            env_map_index_ = texture_manager_.load_hdr(filepath);
+            return env_map_index_ >= 0;
+        }
+
+        int env_map_index() const { return env_map_index_; }
+        cudaTextureObject_t environment_map() const { return texture_manager_.get_handle(env_map_index_); }
+
+        void set_environment_intensity(float intensity) { env_map_intensity_ = intensity; }
+        float environment_intensity() const { return env_map_intensity_; }
 
         void build()
         {
@@ -309,6 +397,8 @@ namespace lumina
         DeviceBuffer<Light> lights_gpu_;
         DeviceBuffer<Sphere> spheres_gpu_;
         TextureManager texture_manager_;
+        int env_map_index_ = -1;
+        float env_map_intensity_ = 2.0f;
     };
 
 }

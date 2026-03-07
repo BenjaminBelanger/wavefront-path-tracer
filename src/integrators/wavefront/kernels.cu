@@ -129,8 +129,15 @@ namespace lumina
         }
     }
 
-    __device__ float3 environment_color(const float3 &direction)
+    __device__ float3 environment_color(const float3 &direction, cudaTextureObject_t env_map, float env_intensity)
     {
+        if (env_map)
+        {
+            float u = atan2f(direction.z, direction.x) * INV_TWO_PI + 0.5f;
+            float v = asinf(fmaxf(-1.0f, fminf(1.0f, direction.y))) * INV_PI + 0.5f;
+            float4 sample = tex2D<float4>(env_map, u, v);
+            return make_float3(sample.x, sample.y, sample.z) * env_intensity;
+        }
 
         float t = 0.5f * (direction.y + 1.0f);
         float3 sky_blue = make_float3(0.5f, 0.7f, 1.0f);
@@ -142,7 +149,9 @@ namespace lumina
         PathStateView paths,
         const HitInfoView hits,
         const int *__restrict__ active_paths,
-        const unsigned int *__restrict__ active_count_ptr)
+        const unsigned int *__restrict__ active_count_ptr,
+        cudaTextureObject_t env_map,
+        float env_intensity)
     {
         int idx = blockIdx.x * blockDim.x + threadIdx.x;
         if (idx >= *active_count_ptr)
@@ -160,7 +169,7 @@ namespace lumina
             paths.ray_dir_y[path_idx],
             paths.ray_dir_z[path_idx]);
 
-        float3 env_color = environment_color(dir);
+        float3 env_color = environment_color(dir, env_map, env_intensity);
         float3 throughput = paths.get_throughput(path_idx);
 
         paths.add_radiance(path_idx, throughput * env_color);
@@ -484,11 +493,13 @@ namespace lumina
         const HitInfoView &hits,
         const int *active_paths,
         const unsigned int *active_count_ptr,
-        int max_threads)
+        int max_threads,
+        cudaTextureObject_t env_map,
+        float env_intensity)
     {
         int block = 256;
         int grid = (max_threads + block - 1) / block;
-        shade_miss_kernel<<<grid, block>>>(paths, hits, active_paths, active_count_ptr);
+        shade_miss_kernel<<<grid, block>>>(paths, hits, active_paths, active_count_ptr, env_map, env_intensity);
     }
 
     void launch_shade_surface(

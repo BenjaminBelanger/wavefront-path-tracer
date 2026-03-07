@@ -37,11 +37,13 @@ namespace lumina
         }
 
         int load_texture(const std::string &filepath);
+        int load_hdr(const std::string &filepath);
 
         void upload();
 
         const cudaTextureObject_t *device_textures() const { return textures_gpu_.data(); }
         int num_textures() const { return static_cast<int>(textures_.size()); }
+        cudaTextureObject_t get_handle(int index) const { return (index >= 0 && index < static_cast<int>(textures_.size())) ? textures_[index].tex_obj : 0; }
 
     private:
         struct TextureData

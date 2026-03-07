@@ -43,6 +43,8 @@ int main(int argc, char **argv)
     int width = 1920;
     int height = 1080;
     std::string scene_path;
+    std::string hdri_path;
+    float hdri_intensity = 2.0f;
     float scene_scale = 1.0f;
 
     for (int i = 1; i < argc; i++)
@@ -64,6 +66,14 @@ int main(int argc, char **argv)
         {
             scene_scale = std::stof(argv[++i]);
         }
+        else if (arg == "--hdri" && i + 1 < argc)
+        {
+            hdri_path = argv[++i];
+        }
+        else if (arg == "--hdri-intensity" && i + 1 < argc)
+        {
+            hdri_intensity = std::stof(argv[++i]);
+        }
         else if (arg == "--help")
         {
             std::cout << "Usage: lumina [options]" << std::endl;
@@ -71,6 +81,8 @@ int main(int argc, char **argv)
             std::cout << "  --height <n>      Window height (default: 1080)" << std::endl;
             std::cout << "  --scene <path>    Load OBJ file" << std::endl;
             std::cout << "  --scale <float>   Scale factor for OBJ (default: 1.0)" << std::endl;
+            std::cout << "  --hdri <path>     HDR environment map (.hdr)" << std::endl;
+            std::cout << "  --hdri-intensity <float>  Env map intensity (default: 2.0)" << std::endl;
             return 0;
         }
     }
@@ -90,12 +102,24 @@ int main(int argc, char **argv)
         }
         else
         {
+            if (!hdri_path.empty())
+            {
+                scene.set_environment_map(hdri_path);
+                scene.set_environment_intensity(hdri_intensity);
+            }
+            else
+                scene.add_default_lighting();
             scene.build();
         }
     }
     else
     {
         scene = create_demo_scene();
+        if (!hdri_path.empty())
+        {
+            scene.set_environment_map(hdri_path);
+            scene.set_environment_intensity(hdri_intensity);
+        }
     }
 
     RenderWindow window(width, height, "Lumina Path Tracer");
