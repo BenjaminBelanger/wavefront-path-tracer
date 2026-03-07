@@ -54,8 +54,10 @@ namespace lumina
 
         if (!mat.diffuse_texname.empty())
         {
-            std::string tex_path = mtl_basedir + mat.diffuse_texname;
-            std::replace(tex_path.begin(), tex_path.end(), '\\', '/');
+            std::string texname = mat.diffuse_texname;
+            std::replace(texname.begin(), texname.end(), '\\', '/');
+            bool is_absolute = (texname.size() >= 2 && texname[1] == ':') || texname[0] == '/';
+            std::string tex_path = is_absolute ? texname : mtl_basedir + texname;
             m.albedo_tex = scene.texture_manager().load_texture(tex_path);
         }
 
