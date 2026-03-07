@@ -1,0 +1,256 @@
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+
+#include "obj_loader.cuh"
+#include "../core/math/matrix.cuh"
+
+#include <iostream>
+#include <algorithm>
+#include <unordered_map>
+#include <cmath>
+
+namespace lumina
+{
+
+    static bool is_non_zero(const float col[3])
+    {
+        return col[0] > 0.0f || col[1] > 0.0f || col[2] > 0.0f;
+    }
+
+    static int map_material(Scene &scene, const tinyobj::material_t &mat)
+    {
+        if (is_non_zero(mat.emission))
+        {
+            float magnitude = std::max({mat.emission[0], mat.emission[1], mat.emission[2]});
+            float3 color = make_float3(
+                mat.emission[0] / magnitude,
+                mat.emission[1] / magnitude,
+                mat.emission[2] / magnitude);
+            return scene.add_material(Material::emissive(color, magnitude));
+        }
+
+        if (mat.dissolve < 1.0f || mat.illum == 4 || mat.illum == 6 || mat.illum == 7)
+        {
+            float ior = mat.ior > 0.0f ? mat.ior : 1.5f;
+            float roughness = mat.roughness > 0.0f ? mat.roughness : 0.0f;
+            return scene.add_material(Material::glass(ior, roughness));
+        }
+
+        if (is_non_zero(mat.specular) && mat.shininess > 100.0f)
+        {
+            float roughness = std::clamp(1.0f - sqrtf(mat.shininess / 1000.0f), 0.02f, 1.0f);
+            float3 color = make_float3(mat.specular[0], mat.specular[1], mat.specular[2]);
+            return scene.add_material(Material::metal(color, roughness));
+        }
+
+        float3 color = make_float3(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
+        if (color.x == 0.0f && color.y == 0.0f && color.z == 0.0f)
+        {
+            color = make_float3(0.8f);
+        }
+        return scene.add_material(Material::diffuse(color));
+    }
+
+    bool load_obj(Scene &scene, const std::string &filepath, const ObjLoadOptions &opts)
+    {
+        tinyobj::attrib_t attrib;
+        std::vector<tinyobj::shape_t> shapes;
+        std::vector<tinyobj::material_t> materials;
+        std::string warn, err;
+
+        std::string mtl_basedir;
+        size_t last_slash = filepath.find_last_of("/\\");
+        if (last_slash != std::string::npos)
+        {
+            mtl_basedir = filepath.substr(0, last_slash + 1);
+        }
+
+        bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err,
+                                    filepath.c_str(), mtl_basedir.c_str(), true);
+
+        if (!warn.empty())
+        {
+            std::cout << "OBJ Warning: " << warn << std::endl;
+        }
+        if (!err.empty())
+        {
+            std::cerr << "OBJ Error: " << err << std::endl;
+        }
+        if (!ret)
+        {
+            std::cerr << "Failed to load OBJ: " << filepath << std::endl;
+            return false;
+        }
+
+        std::vector<int> material_map;
+        material_map.reserve(materials.size());
+        for (const auto &mat : materials)
+        {
+            material_map.push_back(map_material(scene, mat));
+        }
+        int default_material_id = scene.add_material(Material::diffuse(make_float3(0.8f)));
+
+        bool has_normals = !attrib.normals.empty() && !opts.recalculate_normals;
+        bool has_texcoords = !attrib.texcoords.empty();
+
+        std::vector<float3> smooth_normals;
+        if (!has_normals)
+        {
+            size_t vertex_count = attrib.vertices.size() / 3;
+            smooth_normals.resize(vertex_count, make_float3(0.0f));
+
+            for (const auto &shape : shapes)
+            {
+                size_t index_offset = 0;
+                for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++)
+                {
+                    int fv = shape.mesh.num_face_vertices[f];
+                    if (fv == 3)
+                    {
+                        int idx0 = shape.mesh.indices[index_offset + 0].vertex_index;
+                        int idx1 = shape.mesh.indices[index_offset + 1].vertex_index;
+                        int idx2 = shape.mesh.indices[index_offset + 2].vertex_index;
+
+                        float3 p0 = make_float3(
+                            attrib.vertices[3 * idx0 + 0],
+                            attrib.vertices[3 * idx0 + 1],
+                            attrib.vertices[3 * idx0 + 2]);
+                        float3 p1 = make_float3(
+                            attrib.vertices[3 * idx1 + 0],
+                            attrib.vertices[3 * idx1 + 1],
+                            attrib.vertices[3 * idx1 + 2]);
+                        float3 p2 = make_float3(
+                            attrib.vertices[3 * idx2 + 0],
+                            attrib.vertices[3 * idx2 + 1],
+                            attrib.vertices[3 * idx2 + 2]);
+
+                        float3 face_normal = cross(p1 - p0, p2 - p0);
+                        smooth_normals[idx0] = smooth_normals[idx0] + face_normal;
+                        smooth_normals[idx1] = smooth_normals[idx1] + face_normal;
+                        smooth_normals[idx2] = smooth_normals[idx2] + face_normal;
+                    }
+                    index_offset += fv;
+                }
+            }
+
+            for (auto &n : smooth_normals)
+            {
+                float len = length(n);
+                if (len > 0.0f)
+                {
+                    n = n * (1.0f / len);
+                }
+                else
+                {
+                    n = make_float3(0.0f, 1.0f, 0.0f);
+                }
+            }
+        }
+
+        bool needs_transform = opts.scale != 1.0f ||
+                               opts.translation.x != 0.0f || opts.translation.y != 0.0f || opts.translation.z != 0.0f ||
+                               opts.rotation.x != 0.0f || opts.rotation.y != 0.0f || opts.rotation.z != 0.0f;
+
+        Matrix4x4 transform;
+        Matrix4x4 normal_matrix;
+        if (needs_transform)
+        {
+            transform = Matrix4x4::translate(opts.translation) *
+                        Matrix4x4::rotate_z(opts.rotation.z) *
+                        Matrix4x4::rotate_y(opts.rotation.y) *
+                        Matrix4x4::rotate_x(opts.rotation.x) *
+                        Matrix4x4::scale(opts.scale);
+            normal_matrix = transpose(inverse(transform));
+        }
+
+        int total_triangles = 0;
+        for (const auto &shape : shapes)
+        {
+            size_t index_offset = 0;
+            for (size_t f = 0; f < shape.mesh.num_face_vertices.size(); f++)
+            {
+                int fv = shape.mesh.num_face_vertices[f];
+                if (fv != 3)
+                {
+                    index_offset += fv;
+                    continue;
+                }
+
+                Triangle tri;
+
+                for (int i = 0; i < 3; i++)
+                {
+                    tinyobj::index_t idx = shape.mesh.indices[index_offset + i];
+
+                    float3 pos = make_float3(
+                        attrib.vertices[3 * idx.vertex_index + 0],
+                        attrib.vertices[3 * idx.vertex_index + 1],
+                        attrib.vertices[3 * idx.vertex_index + 2]);
+
+                    float3 normal;
+                    if (has_normals && idx.normal_index >= 0)
+                    {
+                        normal = make_float3(
+                            attrib.normals[3 * idx.normal_index + 0],
+                            attrib.normals[3 * idx.normal_index + 1],
+                            attrib.normals[3 * idx.normal_index + 2]);
+                    }
+                    else
+                    {
+                        normal = smooth_normals[idx.vertex_index];
+                    }
+
+                    float2 uv = make_float2(0.0f, 0.0f);
+                    if (has_texcoords && idx.texcoord_index >= 0)
+                    {
+                        uv = make_float2(
+                            attrib.texcoords[2 * idx.texcoord_index + 0],
+                            attrib.texcoords[2 * idx.texcoord_index + 1]);
+                    }
+
+                    if (needs_transform)
+                    {
+                        pos = transform_point(transform, pos);
+                        normal = transform_normal(normal_matrix, normal);
+                    }
+
+                    if (i == 0)
+                    {
+                        tri.v0 = pos;
+                        tri.n0 = normal;
+                        tri.uv0 = uv;
+                    }
+                    else if (i == 1)
+                    {
+                        tri.v1 = pos;
+                        tri.n1 = normal;
+                        tri.uv1 = uv;
+                    }
+                    else
+                    {
+                        tri.v2 = pos;
+                        tri.n2 = normal;
+                        tri.uv2 = uv;
+                    }
+                }
+
+                int mat_idx = shape.mesh.material_ids[f];
+                tri.material_id = (mat_idx >= 0 && mat_idx < static_cast<int>(material_map.size()))
+                                      ? material_map[mat_idx]
+                                      : default_material_id;
+
+                scene.add_triangle(tri);
+                total_triangles++;
+
+                index_offset += fv;
+            }
+        }
+
+        std::cout << "Loaded OBJ: " << filepath << std::endl;
+        std::cout << "  Triangles: " << total_triangles << std::endl;
+        std::cout << "  Materials: " << materials.size() << std::endl;
+
+        return true;
+    }
+
+}
