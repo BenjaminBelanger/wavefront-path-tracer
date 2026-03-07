@@ -2,8 +2,9 @@
 
 #include "scene.cuh"
 
-namespace lumina {
+namespace lumina
+{
 
-Scene create_demo_scene();
+    Scene create_demo_scene();
 
-} 
+}

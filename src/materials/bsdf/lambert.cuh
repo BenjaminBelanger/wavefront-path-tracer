@@ -3,209 +3,215 @@
 #include "bsdf.cuh"
 #include "ggx.cuh"
 
-namespace lumina {
+namespace lumina
+{
 
+    struct LambertBSDF
+    {
+        float3 albedo;
 
+        __host__ __device__ LambertBSDF(const float3 &color) : albedo(color) {}
 
+        __host__ __device__ float3 evaluate(const float3 &wo_local, const float3 &wi_local) const
+        {
 
-
-
-
-
-struct LambertBSDF {
-    float3 albedo;
-
-    __host__ __device__ LambertBSDF(const float3& color) : albedo(color) {}
-
-    
-    __host__ __device__ float3 evaluate(const float3& wo_local, const float3& wi_local) const {
-        
-        if (wo_local.z <= 0.0f || wi_local.z <= 0.0f) {
-            return make_float3(0.0f);
+            if (wo_local.z <= 0.0f || wi_local.z <= 0.0f)
+            {
+                return make_float3(0.0f);
+            }
+            return albedo * INV_PI;
         }
-        return albedo * INV_PI;
-    }
 
-    
-    __host__ __device__ BSDFSample sample(const float3& wo_local, float u1, float u2) const {
-        BSDFSample sample;
+        __host__ __device__ BSDFSample sample(const float3 &wo_local, float u1, float u2) const
+        {
+            BSDFSample sample;
 
-        
-        if (wo_local.z <= 0.0f) {
+            if (wo_local.z <= 0.0f)
+            {
+                return sample;
+            }
+
+            sample.wi = sample_hemisphere_cosine(u1, u2);
+            sample.pdf = pdf_hemisphere_cosine(sample.wi.z);
+
+            sample.f = albedo * sample.wi.z;
+
+            sample.is_specular = false;
+            sample.is_transmission = false;
+
             return sample;
         }
 
-        
-        sample.wi = sample_hemisphere_cosine(u1, u2);
-        sample.pdf = pdf_hemisphere_cosine(sample.wi.z);
-
-        
-        
-        
-        sample.f = albedo * sample.wi.z;  
-
-        sample.is_specular = false;
-        sample.is_transmission = false;
-
-        return sample;
-    }
-
-    
-    __host__ __device__ float pdf(const float3& wo_local, const float3& wi_local) const {
-        if (wo_local.z <= 0.0f || wi_local.z <= 0.0f) {
-            return 0.0f;
+        __host__ __device__ float pdf(const float3 &wo_local, const float3 &wi_local) const
+        {
+            if (wo_local.z <= 0.0f || wi_local.z <= 0.0f)
+            {
+                return 0.0f;
+            }
+            return pdf_hemisphere_cosine(wi_local.z);
         }
-        return pdf_hemisphere_cosine(wi_local.z);
-    }
-};
+    };
 
+    struct SpectralLambertBSDF
+    {
+        SpectralRadiance albedo;
 
+        __host__ __device__ SpectralLambertBSDF(const SpectralRadiance &color) : albedo(color) {}
 
-
-
-struct SpectralLambertBSDF {
-    SpectralRadiance albedo;
-
-    __host__ __device__ SpectralLambertBSDF(const SpectralRadiance& color) : albedo(color) {}
-
-    __host__ __device__ SpectralRadiance evaluate(const float3& wo_local, const float3& wi_local) const {
-        if (wo_local.z <= 0.0f || wi_local.z <= 0.0f) {
-            return SpectralRadiance(0.0f);
+        __host__ __device__ SpectralRadiance evaluate(const float3 &wo_local, const float3 &wi_local) const
+        {
+            if (wo_local.z <= 0.0f || wi_local.z <= 0.0f)
+            {
+                return SpectralRadiance(0.0f);
+            }
+            return albedo * INV_PI;
         }
-        return albedo * INV_PI;
-    }
 
-    __host__ __device__ SpectralBSDFSample sample(const float3& wo_local, float u1, float u2) const {
-        SpectralBSDFSample sample;
+        __host__ __device__ SpectralBSDFSample sample(const float3 &wo_local, float u1, float u2) const
+        {
+            SpectralBSDFSample sample;
 
-        if (wo_local.z <= 0.0f) {
+            if (wo_local.z <= 0.0f)
+            {
+                return sample;
+            }
+
+            sample.wi = sample_hemisphere_cosine(u1, u2);
+            sample.pdf = pdf_hemisphere_cosine(sample.wi.z);
+            sample.f = albedo * sample.wi.z;
+            sample.is_specular = false;
+            sample.is_transmission = false;
+
             return sample;
         }
 
-        sample.wi = sample_hemisphere_cosine(u1, u2);
-        sample.pdf = pdf_hemisphere_cosine(sample.wi.z);
-        sample.f = albedo * sample.wi.z;
-        sample.is_specular = false;
-        sample.is_transmission = false;
-
-        return sample;
-    }
-
-    __host__ __device__ float pdf(const float3& wo_local, const float3& wi_local) const {
-        if (wo_local.z <= 0.0f || wi_local.z <= 0.0f) {
-            return 0.0f;
+        __host__ __device__ float pdf(const float3 &wo_local, const float3 &wi_local) const
+        {
+            if (wo_local.z <= 0.0f || wi_local.z <= 0.0f)
+            {
+                return 0.0f;
+            }
+            return pdf_hemisphere_cosine(wi_local.z);
         }
-        return pdf_hemisphere_cosine(wi_local.z);
-    }
-};
+    };
 
+    struct OrenNayarBSDF
+    {
+        float3 albedo;
+        float sigma;
+        float A, B;
 
-
-
-
-struct OrenNayarBSDF {
-    float3 albedo;
-    float sigma;  
-    float A, B;   
-
-    __host__ __device__ OrenNayarBSDF(const float3& color, float roughness)
-        : albedo(color), sigma(roughness) {
-        float sigma2 = sigma * sigma;
-        A = 1.0f - 0.5f * sigma2 / (sigma2 + 0.33f);
-        B = 0.45f * sigma2 / (sigma2 + 0.09f);
-    }
-
-    __host__ __device__ float3 evaluate(const float3& wo_local, const float3& wi_local) const {
-        if (wo_local.z <= 0.0f || wi_local.z <= 0.0f) {
-            return make_float3(0.0f);
+        __host__ __device__ OrenNayarBSDF(const float3 &color, float roughness)
+            : albedo(color), sigma(roughness)
+        {
+            float sigma2 = sigma * sigma;
+            A = 1.0f - 0.5f * sigma2 / (sigma2 + 0.33f);
+            B = 0.45f * sigma2 / (sigma2 + 0.09f);
         }
 
-        float sin_theta_i = sqrtf(fmaxf(0.0f, 1.0f - wi_local.z * wi_local.z));
-        float sin_theta_o = sqrtf(fmaxf(0.0f, 1.0f - wo_local.z * wo_local.z));
+        __host__ __device__ float3 evaluate(const float3 &wo_local, const float3 &wi_local) const
+        {
+            if (wo_local.z <= 0.0f || wi_local.z <= 0.0f)
+            {
+                return make_float3(0.0f);
+            }
 
-        
-        float max_cos = 0.0f;
-        if (sin_theta_i > 1e-4f && sin_theta_o > 1e-4f) {
-            float cos_phi_diff = (wi_local.x * wo_local.x + wi_local.y * wo_local.y) /
-                                 (sin_theta_i * sin_theta_o);
-            max_cos = fmaxf(0.0f, cos_phi_diff);
+            float sin_theta_i = sqrtf(fmaxf(0.0f, 1.0f - wi_local.z * wi_local.z));
+            float sin_theta_o = sqrtf(fmaxf(0.0f, 1.0f - wo_local.z * wo_local.z));
+
+            float max_cos = 0.0f;
+            if (sin_theta_i > 1e-4f && sin_theta_o > 1e-4f)
+            {
+                float cos_phi_diff = (wi_local.x * wo_local.x + wi_local.y * wo_local.y) /
+                                     (sin_theta_i * sin_theta_o);
+                max_cos = fmaxf(0.0f, cos_phi_diff);
+            }
+
+            float sin_alpha, tan_beta;
+            if (wi_local.z > wo_local.z)
+            {
+                sin_alpha = sin_theta_o;
+                tan_beta = sin_theta_i / wi_local.z;
+            }
+            else
+            {
+                sin_alpha = sin_theta_i;
+                tan_beta = sin_theta_o / wo_local.z;
+            }
+
+            return albedo * INV_PI * (A + B * max_cos * sin_alpha * tan_beta);
         }
 
-        
-        float sin_alpha, tan_beta;
-        if (wi_local.z > wo_local.z) {
-            sin_alpha = sin_theta_o;
-            tan_beta = sin_theta_i / wi_local.z;
-        } else {
-            sin_alpha = sin_theta_i;
-            tan_beta = sin_theta_o / wo_local.z;
-        }
+        __host__ __device__ BSDFSample sample(const float3 &wo_local, float u1, float u2) const
+        {
+            BSDFSample sample;
 
-        return albedo * INV_PI * (A + B * max_cos * sin_alpha * tan_beta);
-    }
+            if (wo_local.z <= 0.0f)
+            {
+                return sample;
+            }
 
-    __host__ __device__ BSDFSample sample(const float3& wo_local, float u1, float u2) const {
-        BSDFSample sample;
+            sample.wi = sample_hemisphere_cosine(u1, u2);
+            sample.pdf = pdf_hemisphere_cosine(sample.wi.z);
+            sample.f = evaluate(wo_local, sample.wi) * sample.wi.z;
+            sample.is_specular = false;
+            sample.is_transmission = false;
 
-        if (wo_local.z <= 0.0f) {
             return sample;
         }
 
-        
-        sample.wi = sample_hemisphere_cosine(u1, u2);
-        sample.pdf = pdf_hemisphere_cosine(sample.wi.z);
-        sample.f = evaluate(wo_local, sample.wi) * sample.wi.z;
-        sample.is_specular = false;
-        sample.is_transmission = false;
-
-        return sample;
-    }
-
-    __host__ __device__ float pdf(const float3& wo_local, const float3& wi_local) const {
-        if (wo_local.z <= 0.0f || wi_local.z <= 0.0f) {
-            return 0.0f;
+        __host__ __device__ float pdf(const float3 &wo_local, const float3 &wi_local) const
+        {
+            if (wo_local.z <= 0.0f || wi_local.z <= 0.0f)
+            {
+                return 0.0f;
+            }
+            return pdf_hemisphere_cosine(wi_local.z);
         }
-        return pdf_hemisphere_cosine(wi_local.z);
-    }
-};
+    };
 
+    __device__ inline BSDFSample sample_bsdf(
+        const Material &material,
+        const ShadingContext &ctx,
+        float u1, float u2)
+    {
+        float3 wo_local = ctx.to_local(ctx.wo);
 
-
-
-
-__device__ inline BSDFSample sample_bsdf(
-    const Material& material,
-    const ShadingContext& ctx,
-    float u1, float u2
-) {
-    float3 wo_local = ctx.to_local(ctx.wo);
-
-    switch (material.type) {
-        case MaterialType::Lambert: {
+        switch (material.type)
+        {
+        case MaterialType::Lambert:
+        {
             LambertBSDF bsdf(material.albedo);
             BSDFSample sample = bsdf.sample(wo_local, u1, u2);
-            if (sample.is_valid()) {
+            if (sample.is_valid())
+            {
                 sample.wi = ctx.to_world(sample.wi);
             }
             return sample;
         }
-        case MaterialType::Metal: {
-            
-            BSDFSample sample;
-            if (wo_local.z <= 0.0f) return sample;
+        case MaterialType::Metal:
+        {
 
-            if (material.roughness < 0.01f) {
-                
+            BSDFSample sample;
+            if (wo_local.z <= 0.0f)
+                return sample;
+
+            if (material.roughness < 0.01f)
+            {
+
                 sample.wi = make_float3(-wo_local.x, -wo_local.y, wo_local.z);
                 sample.f = material.albedo * wo_local.z;
                 sample.pdf = 1.0f;
                 sample.is_specular = true;
-            } else {
-                
+            }
+            else
+            {
+
                 float alpha = material.roughness * material.roughness;
                 float3 h = ggx_sample_vndf(wo_local, alpha, u1, u2);
                 sample.wi = reflect(-wo_local, h);
-                if (sample.wi.z <= 0.0f) return sample;
+                if (sample.wi.z <= 0.0f)
+                    return sample;
 
                 float D = ggx_d(h.z, alpha);
                 float G = ggx_g(wo_local.z, sample.wi.z, alpha);
@@ -216,15 +222,18 @@ __device__ inline BSDFSample sample_bsdf(
                 sample.is_specular = false;
             }
             sample.is_transmission = false;
-            if (sample.is_valid()) {
+            if (sample.is_valid())
+            {
                 sample.wi = ctx.to_world(sample.wi);
             }
             return sample;
         }
-        case MaterialType::Dielectric: {
-            
+        case MaterialType::Dielectric:
+        {
+
             BSDFSample sample;
-            if (wo_local.z == 0.0f) return sample;
+            if (wo_local.z == 0.0f)
+                return sample;
 
             bool entering = wo_local.z > 0.0f;
             float eta = entering ? (1.0f / material.ior) : material.ior;
@@ -233,89 +242,103 @@ __device__ inline BSDFSample sample_bsdf(
             float cos_theta = fabsf(wo_local.z);
             float F = fresnel_dielectric(cos_theta, eta);
 
-            
-            if (u1 < F) {
-                
+            if (u1 < F)
+            {
+
                 sample.wi = make_float3(-wo_local.x, -wo_local.y, wo_local.z);
                 sample.f = make_float3(1.0f) * fabsf(sample.wi.z);
                 sample.pdf = F;
                 sample.is_specular = true;
                 sample.is_transmission = false;
-            } else {
-                
+            }
+            else
+            {
+
                 float3 refracted;
                 float3 wo_n = entering ? wo_local : -wo_local;
-                if (!refract(wo_n, n, eta, refracted)) {
-                    
+                if (!refract(wo_n, n, eta, refracted))
+                {
+
                     sample.wi = make_float3(-wo_local.x, -wo_local.y, wo_local.z);
                     sample.f = make_float3(1.0f) * fabsf(sample.wi.z);
                     sample.pdf = 1.0f;
                     sample.is_specular = true;
                     sample.is_transmission = false;
-                } else {
+                }
+                else
+                {
                     sample.wi = entering ? refracted : -refracted;
-                    
+
                     sample.f = make_float3(eta * eta) * fabsf(sample.wi.z);
                     sample.pdf = 1.0f - F;
                     sample.is_specular = true;
                     sample.is_transmission = true;
                 }
             }
-            if (sample.is_valid()) {
+            if (sample.is_valid())
+            {
                 sample.wi = ctx.to_world(sample.wi);
             }
             return sample;
         }
-        default: {
-            
+        default:
+        {
+
             LambertBSDF bsdf(material.albedo);
             BSDFSample sample = bsdf.sample(wo_local, u1, u2);
-            if (sample.is_valid()) {
+            if (sample.is_valid())
+            {
                 sample.wi = ctx.to_world(sample.wi);
             }
             return sample;
         }
+        }
     }
-}
 
-__device__ inline float3 evaluate_bsdf(
-    const Material& material,
-    const ShadingContext& ctx,
-    const float3& wi
-) {
-    float3 wo_local = ctx.to_local(ctx.wo);
-    float3 wi_local = ctx.to_local(wi);
+    __device__ inline float3 evaluate_bsdf(
+        const Material &material,
+        const ShadingContext &ctx,
+        const float3 &wi)
+    {
+        float3 wo_local = ctx.to_local(ctx.wo);
+        float3 wi_local = ctx.to_local(wi);
 
-    switch (material.type) {
-        case MaterialType::Lambert: {
+        switch (material.type)
+        {
+        case MaterialType::Lambert:
+        {
             LambertBSDF bsdf(material.albedo);
             return bsdf.evaluate(wo_local, wi_local);
         }
-        default: {
+        default:
+        {
             LambertBSDF bsdf(material.albedo);
             return bsdf.evaluate(wo_local, wi_local);
         }
+        }
     }
-}
 
-__device__ inline float pdf_bsdf(
-    const Material& material,
-    const ShadingContext& ctx,
-    const float3& wi
-) {
-    float3 wo_local = ctx.to_local(ctx.wo);
-    float3 wi_local = ctx.to_local(wi);
+    __device__ inline float pdf_bsdf(
+        const Material &material,
+        const ShadingContext &ctx,
+        const float3 &wi)
+    {
+        float3 wo_local = ctx.to_local(ctx.wo);
+        float3 wi_local = ctx.to_local(wi);
 
-    switch (material.type) {
-        case MaterialType::Lambert: {
+        switch (material.type)
+        {
+        case MaterialType::Lambert:
+        {
             LambertBSDF bsdf(material.albedo);
             return bsdf.pdf(wo_local, wi_local);
         }
-        default: {
+        default:
+        {
             LambertBSDF bsdf(material.albedo);
             return bsdf.pdf(wo_local, wi_local);
         }
+        }
     }
-}
 
-} 
+}
