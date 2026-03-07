@@ -277,19 +277,21 @@ namespace lumina
                 }
                 std::sort(axis_sorted.begin(), axis_sorted.end());
 
+                std::vector<AABB> right_bounds_arr(prim_count);
+                right_bounds_arr[prim_count - 1] = sorted_prims[axis_sorted[prim_count - 1].second].bounds();
+                for (int i = prim_count - 2; i >= 0; i--)
+                {
+                    right_bounds_arr[i] = union_aabb(right_bounds_arr[i + 1],
+                                                     sorted_prims[axis_sorted[i].second].bounds());
+                }
+
                 AABB left_bounds = AABB::empty();
                 for (int i = 0; i < prim_count - 1; i++)
                 {
                     left_bounds.expand(sorted_prims[axis_sorted[i].second].bounds());
 
-                    AABB right_bounds = AABB::empty();
-                    for (int j = i + 1; j < prim_count; j++)
-                    {
-                        right_bounds.expand(sorted_prims[axis_sorted[j].second].bounds());
-                    }
-
                     float cost = 0.125f + (left_bounds.surface_area() * (i + 1) +
-                                           right_bounds.surface_area() * (prim_count - i - 1)) *
+                                           right_bounds_arr[i + 1].surface_area() * (prim_count - i - 1)) *
                                               inv_parent_area;
 
                     if (cost < best_cost)
@@ -301,22 +303,24 @@ namespace lumina
                 }
             }
 
-            if (best_cost >= prim_count)
+            if (best_cost >= prim_count && prim_count <= 8)
             {
                 node.left_or_first = entry.start;
                 node.prim_count = prim_count;
                 continue;
             }
 
-            std::sort(sorted_prims.begin() + entry.start, sorted_prims.begin() + entry.end,
-                      [best_axis](const Triangle &a, const Triangle &b)
-                      {
-                          float ca = (best_axis == 0) ? a.centroid().x : (best_axis == 1) ? a.centroid().y
-                                                                                          : a.centroid().z;
-                          float cb = (best_axis == 0) ? b.centroid().x : (best_axis == 1) ? b.centroid().y
-                                                                                          : b.centroid().z;
-                          return ca < cb;
-                      });
+            std::nth_element(sorted_prims.begin() + entry.start,
+                             sorted_prims.begin() + best_split,
+                             sorted_prims.begin() + entry.end,
+                             [best_axis](const Triangle &a, const Triangle &b)
+                             {
+                                 float ca = (best_axis == 0) ? a.centroid().x : (best_axis == 1) ? a.centroid().y
+                                                                                                 : a.centroid().z;
+                                 float cb = (best_axis == 0) ? b.centroid().x : (best_axis == 1) ? b.centroid().y
+                                                                                                 : b.centroid().z;
+                                 return ca < cb;
+                             });
 
             int left_child = static_cast<int>(nodes.size());
             nodes.push_back(BVHNode());
@@ -334,6 +338,13 @@ namespace lumina
 
         nodes_.upload(nodes.data(), nodes.size());
         primitives_.upload(sorted_prims.data(), sorted_prims.size());
+
+        std::vector<TrianglePrecomputed> precomputed(sorted_prims.size());
+        for (size_t i = 0; i < sorted_prims.size(); i++)
+        {
+            precomputed[i].from_triangle(sorted_prims[i]);
+        }
+        precomputed_.upload(precomputed.data(), precomputed.size());
     }
 
 }

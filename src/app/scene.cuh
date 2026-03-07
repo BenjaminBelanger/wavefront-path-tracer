@@ -145,6 +145,7 @@ namespace lumina
 
         const BVHNode *bvh_nodes() const { return bvh_.nodes(); }
         const Triangle *triangles() const { return bvh_.primitives(); }
+        const TrianglePrecomputed *precomputed_triangles() const { return bvh_.precomputed(); }
         const Material *materials() const { return materials_gpu_.data(); }
         const Light *lights() const { return lights_gpu_.data(); }
         const Sphere *spheres() const { return spheres_gpu_.data(); }

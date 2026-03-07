@@ -68,12 +68,13 @@ namespace lumina
         PathStateView paths,
         HitInfoView hits,
         const BVHNode *__restrict__ bvh_nodes,
+        const TrianglePrecomputed *__restrict__ precomputed,
         const Triangle *__restrict__ triangles,
         const int *__restrict__ active_paths,
-        int active_count)
+        const unsigned int *__restrict__ active_count_ptr)
     {
         int idx = blockIdx.x * blockDim.x + threadIdx.x;
-        if (idx >= active_count)
+        if (idx >= *active_count_ptr)
             return;
 
         int path_idx = active_paths[idx];
@@ -90,7 +91,7 @@ namespace lumina
         float t_hit, u_hit, v_hit;
         int prim_id, mat_id;
 
-        bool hit = traverse_bvh(bvh_nodes, triangles, ray, t_hit, u_hit, v_hit, prim_id, mat_id);
+        bool hit = traverse_bvh(bvh_nodes, precomputed, ray, t_hit, u_hit, v_hit, prim_id, mat_id);
 
         if (hit)
         {
@@ -137,10 +138,10 @@ namespace lumina
         PathStateView paths,
         const HitInfoView hits,
         const int *__restrict__ active_paths,
-        int active_count)
+        const unsigned int *__restrict__ active_count_ptr)
     {
         int idx = blockIdx.x * blockDim.x + threadIdx.x;
-        if (idx >= active_count)
+        if (idx >= *active_count_ptr)
             return;
 
         int path_idx = active_paths[idx];
@@ -170,11 +171,11 @@ namespace lumina
         const int *__restrict__ active_paths,
         unsigned int *__restrict__ next_count,
         int *__restrict__ next_paths,
-        int active_count,
+        const unsigned int *__restrict__ active_count_ptr,
         int max_depth)
     {
         int idx = blockIdx.x * blockDim.x + threadIdx.x;
-        if (idx >= active_count)
+        if (idx >= *active_count_ptr)
             return;
 
         int path_idx = active_paths[idx];
@@ -278,7 +279,7 @@ namespace lumina
     __global__ void trace_shadow_kernel(
         PathStateView paths,
         const BVHNode *__restrict__ bvh_nodes,
-        const Triangle *__restrict__ triangles,
+        const TrianglePrecomputed *__restrict__ precomputed,
         const float3 *__restrict__ shadow_origins,
         const float3 *__restrict__ shadow_directions,
         const float *__restrict__ shadow_max_t,
@@ -298,7 +299,7 @@ namespace lumina
         shadow_ray.t_min = RAY_EPSILON;
         shadow_ray.t_max = shadow_max_t[idx] - RAY_EPSILON;
 
-        bool occluded = traverse_bvh_shadow(bvh_nodes, triangles, shadow_ray);
+        bool occluded = traverse_bvh_shadow(bvh_nodes, precomputed, shadow_ray);
 
         if (!occluded)
         {
@@ -455,28 +456,27 @@ namespace lumina
         PathStateView paths,
         HitInfoView hits,
         const BVHNode *bvh_nodes,
+        const TrianglePrecomputed *precomputed,
         const Triangle *triangles,
         const int *active_paths,
-        int active_count)
+        const unsigned int *active_count_ptr,
+        int max_threads)
     {
-        if (active_count == 0)
-            return;
         int block = 256;
-        int grid = (active_count + block - 1) / block;
-        intersect_kernel<<<grid, block>>>(paths, hits, bvh_nodes, triangles, active_paths, active_count);
+        int grid = (max_threads + block - 1) / block;
+        intersect_kernel<<<grid, block>>>(paths, hits, bvh_nodes, precomputed, triangles, active_paths, active_count_ptr);
     }
 
     void launch_shade_miss(
         PathStateView paths,
         const HitInfoView &hits,
         const int *active_paths,
-        int active_count)
+        const unsigned int *active_count_ptr,
+        int max_threads)
     {
-        if (active_count == 0)
-            return;
         int block = 256;
-        int grid = (active_count + block - 1) / block;
-        shade_miss_kernel<<<grid, block>>>(paths, hits, active_paths, active_count);
+        int grid = (max_threads + block - 1) / block;
+        shade_miss_kernel<<<grid, block>>>(paths, hits, active_paths, active_count_ptr);
     }
 
     void launch_shade_surface(
@@ -486,15 +486,14 @@ namespace lumina
         const int *active_paths,
         unsigned int *next_count,
         int *next_paths,
-        int active_count,
+        const unsigned int *active_count_ptr,
+        int max_threads,
         int max_depth)
     {
-        if (active_count == 0)
-            return;
         int block = 256;
-        int grid = (active_count + block - 1) / block;
+        int grid = (max_threads + block - 1) / block;
         shade_surface_kernel<<<grid, block>>>(paths, hits, materials, active_paths,
-                                              next_count, next_paths, active_count, max_depth);
+                                              next_count, next_paths, active_count_ptr, max_depth);
     }
 
     void launch_accumulate(

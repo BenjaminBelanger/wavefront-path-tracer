@@ -141,6 +141,21 @@ namespace lumina
 
             return t_near <= t_far;
         }
+
+        __host__ __device__ bool intersect_fast(const float3 &origin, const float3 &inv_dir,
+                                                float t_min, float t_max, float &t_near_out) const
+        {
+            float3 t0 = (min_bound - origin) * inv_dir;
+            float3 t1 = (max_bound - origin) * inv_dir;
+
+            float3 t_min_vec = min(t0, t1);
+            float3 t_max_vec = max(t0, t1);
+
+            t_near_out = fmaxf(fmaxf(t_min_vec.x, t_min_vec.y), fmaxf(t_min_vec.z, t_min));
+            float t_far = fminf(fminf(t_max_vec.x, t_max_vec.y), fminf(t_max_vec.z, t_max));
+
+            return t_near_out <= t_far;
+        }
     };
 
     __host__ __device__ inline AABB union_aabb(const AABB &a, const AABB &b)
