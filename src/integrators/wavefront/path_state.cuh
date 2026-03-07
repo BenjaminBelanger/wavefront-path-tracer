@@ -264,6 +264,7 @@ namespace lumina
         DeviceBuffer<float> pos_x, pos_y, pos_z;
         DeviceBuffer<float> normal_x, normal_y, normal_z;
         DeviceBuffer<float> geom_normal_x, geom_normal_y, geom_normal_z;
+        DeviceBuffer<float> tex_u, tex_v;
 
         void resize(size_t count)
         {
@@ -281,6 +282,8 @@ namespace lumina
             geom_normal_x.resize(count);
             geom_normal_y.resize(count);
             geom_normal_z.resize(count);
+            tex_u.resize(count);
+            tex_v.resize(count);
         }
 
         size_t size() const { return t.size(); }
@@ -302,6 +305,8 @@ namespace lumina
         float *__restrict__ geom_normal_x;
         float *__restrict__ geom_normal_y;
         float *__restrict__ geom_normal_z;
+        float *__restrict__ tex_u;
+        float *__restrict__ tex_v;
 
         __device__ bool has_hit(int idx) const
         {
@@ -322,6 +327,11 @@ namespace lumina
         {
             return make_float3(geom_normal_x[idx], geom_normal_y[idx], geom_normal_z[idx]);
         }
+
+        __device__ float2 get_tex_uv(int idx) const
+        {
+            return make_float2(tex_u[idx], tex_v[idx]);
+        }
     };
 
     inline HitInfoView make_view(HitInfoSoA &hits)
@@ -341,6 +351,8 @@ namespace lumina
         view.geom_normal_x = hits.geom_normal_x.data();
         view.geom_normal_y = hits.geom_normal_y.data();
         view.geom_normal_z = hits.geom_normal_z.data();
+        view.tex_u = hits.tex_u.data();
+        view.tex_v = hits.tex_v.data();
         return view;
     }
 

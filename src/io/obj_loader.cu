@@ -17,8 +17,10 @@ namespace lumina
         return col[0] > 0.0f || col[1] > 0.0f || col[2] > 0.0f;
     }
 
-    static int map_material(Scene &scene, const tinyobj::material_t &mat)
+    static int map_material(Scene &scene, const tinyobj::material_t &mat, const std::string &mtl_basedir)
     {
+        Material m;
+
         if (is_non_zero(mat.emission))
         {
             float magnitude = std::max({mat.emission[0], mat.emission[1], mat.emission[2]});
@@ -26,29 +28,38 @@ namespace lumina
                 mat.emission[0] / magnitude,
                 mat.emission[1] / magnitude,
                 mat.emission[2] / magnitude);
-            return scene.add_material(Material::emissive(color, magnitude));
+            m = Material::emissive(color, magnitude);
         }
-
-        if (mat.dissolve < 1.0f || mat.illum == 4 || mat.illum == 6 || mat.illum == 7)
+        else if (mat.dissolve < 1.0f || mat.illum == 4 || mat.illum == 6 || mat.illum == 7)
         {
             float ior = mat.ior > 0.0f ? mat.ior : 1.5f;
             float roughness = mat.roughness > 0.0f ? mat.roughness : 0.0f;
-            return scene.add_material(Material::glass(ior, roughness));
+            m = Material::glass(ior, roughness);
         }
-
-        if (is_non_zero(mat.specular) && mat.shininess > 100.0f)
+        else if (is_non_zero(mat.specular) && mat.shininess > 100.0f && !is_non_zero(mat.diffuse))
         {
             float roughness = std::clamp(1.0f - sqrtf(mat.shininess / 1000.0f), 0.02f, 1.0f);
             float3 color = make_float3(mat.specular[0], mat.specular[1], mat.specular[2]);
-            return scene.add_material(Material::metal(color, roughness));
+            m = Material::metal(color, roughness);
+        }
+        else
+        {
+            float3 color = make_float3(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
+            if (color.x == 0.0f && color.y == 0.0f && color.z == 0.0f)
+            {
+                color = make_float3(0.8f);
+            }
+            m = Material::diffuse(color);
         }
 
-        float3 color = make_float3(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
-        if (color.x == 0.0f && color.y == 0.0f && color.z == 0.0f)
+        if (!mat.diffuse_texname.empty())
         {
-            color = make_float3(0.8f);
+            std::string tex_path = mtl_basedir + mat.diffuse_texname;
+            std::replace(tex_path.begin(), tex_path.end(), '\\', '/');
+            m.albedo_tex = scene.texture_manager().load_texture(tex_path);
         }
-        return scene.add_material(Material::diffuse(color));
+
+        return scene.add_material(m);
     }
 
     bool load_obj(Scene &scene, const std::string &filepath, const ObjLoadOptions &opts)
@@ -86,7 +97,7 @@ namespace lumina
         material_map.reserve(materials.size());
         for (const auto &mat : materials)
         {
-            material_map.push_back(map_material(scene, mat));
+            material_map.push_back(map_material(scene, mat, mtl_basedir));
         }
         int default_material_id = scene.add_material(Material::diffuse(make_float3(0.8f)));
 
