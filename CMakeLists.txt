@@ -48,13 +48,6 @@ if(NOT glm_FOUND)
     FetchContent_MakeAvailable(glm)
 endif()
 
-include(FetchContent)
-FetchContent_Declare(
-    tinyobjloader
-    GIT_REPOSITORY https://github.com/tinyobjloader/tinyobjloader.git
-    GIT_TAG v2.0.0rc13
-)
-FetchContent_Populate(tinyobjloader)
 
 set(CORE_SOURCES
     src/core/math/vector.cuh
@@ -123,7 +116,7 @@ set(GLAD_SOURCES
 set(EXTERNAL_INCLUDES
     ${CMAKE_SOURCE_DIR}/external
     ${CMAKE_SOURCE_DIR}/external/glad/include
-    ${tinyobjloader_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/external/tinyobjloader
 )
 
 add_executable(lumina

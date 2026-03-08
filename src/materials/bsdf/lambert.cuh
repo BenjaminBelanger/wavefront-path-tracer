@@ -228,6 +228,48 @@ namespace lumina
             }
             return sample;
         }
+        case MaterialType::Plastic:
+        {
+            BSDFSample sample;
+            if (wo_local.z <= 0.0f)
+                return sample;
+
+            float cos_theta = wo_local.z;
+            float F0 = ((material.ior - 1.0f) * (material.ior - 1.0f)) /
+                        ((material.ior + 1.0f) * (material.ior + 1.0f));
+            float F = F0 + (1.0f - F0) * powf(1.0f - cos_theta, 5.0f);
+
+            if (u1 < F)
+            {
+                float alpha = fmaxf(material.roughness * material.roughness, 0.001f);
+                float3 h = ggx_sample_vndf(wo_local, alpha, u1 / F, u2);
+                sample.wi = reflect(-wo_local, h);
+                if (sample.wi.z <= 0.0f)
+                    return sample;
+
+                float D = ggx_d(h.z, alpha);
+                float G = ggx_g(wo_local.z, sample.wi.z, alpha);
+
+                sample.f = make_float3(D * G / (4.0f * wo_local.z));
+                float spec_pdf = ggx_vndf_pdf(wo_local, h, alpha) / (4.0f * dot(wo_local, h));
+                sample.pdf = F * spec_pdf;
+                sample.is_specular = (material.roughness < 0.01f);
+            }
+            else
+            {
+                sample.wi = sample_hemisphere_cosine((u1 - F) / (1.0f - F), u2);
+                float diff_pdf = pdf_hemisphere_cosine(sample.wi.z);
+                sample.pdf = (1.0f - F) * diff_pdf;
+                sample.f = material.albedo * INV_PI * sample.wi.z * (1.0f - F);
+                sample.is_specular = false;
+            }
+            sample.is_transmission = false;
+            if (sample.is_valid())
+            {
+                sample.wi = ctx.to_world(sample.wi);
+            }
+            return sample;
+        }
         case MaterialType::Dielectric:
         {
 
@@ -310,6 +352,21 @@ namespace lumina
             LambertBSDF bsdf(material.albedo);
             return bsdf.evaluate(wo_local, wi_local);
         }
+        case MaterialType::Plastic:
+        {
+            if (wo_local.z <= 0.0f || wi_local.z <= 0.0f)
+                return make_float3(0.0f);
+            float F0 = ((material.ior - 1.0f) * (material.ior - 1.0f)) /
+                        ((material.ior + 1.0f) * (material.ior + 1.0f));
+            float F = F0 + (1.0f - F0) * powf(1.0f - wo_local.z, 5.0f);
+            float alpha = fmaxf(material.roughness * material.roughness, 0.001f);
+            float3 h = normalize(wo_local + wi_local);
+            float D = ggx_d(h.z, alpha);
+            float G = ggx_g(wo_local.z, wi_local.z, alpha);
+            float3 spec = make_float3(F * D * G / (4.0f * wo_local.z * wi_local.z));
+            float3 diff = material.albedo * INV_PI * (1.0f - F);
+            return spec + diff;
+        }
         default:
         {
             LambertBSDF bsdf(material.albedo);
@@ -332,6 +389,19 @@ namespace lumina
         {
             LambertBSDF bsdf(material.albedo);
             return bsdf.pdf(wo_local, wi_local);
+        }
+        case MaterialType::Plastic:
+        {
+            if (wo_local.z <= 0.0f || wi_local.z <= 0.0f)
+                return 0.0f;
+            float F0 = ((material.ior - 1.0f) * (material.ior - 1.0f)) /
+                        ((material.ior + 1.0f) * (material.ior + 1.0f));
+            float F = F0 + (1.0f - F0) * powf(1.0f - wo_local.z, 5.0f);
+            float alpha = fmaxf(material.roughness * material.roughness, 0.001f);
+            float3 h = normalize(wo_local + wi_local);
+            float spec_pdf = ggx_vndf_pdf(wo_local, h, alpha) / (4.0f * dot(wo_local, h));
+            float diff_pdf = pdf_hemisphere_cosine(wi_local.z);
+            return F * spec_pdf + (1.0f - F) * diff_pdf;
         }
         default:
         {

@@ -121,6 +121,16 @@ namespace lumina
             return m;
         }
 
+        __host__ static Material plastic(const float3 &color, float rough, float ior_val = 1.5f)
+        {
+            Material m;
+            m.type = MaterialType::Plastic;
+            m.albedo = color;
+            m.roughness = rough;
+            m.ior = ior_val;
+            return m;
+        }
+
         __host__ static Material emissive(const float3 &color, float strength)
         {
             Material m;

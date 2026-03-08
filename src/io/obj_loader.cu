@@ -17,9 +17,47 @@ namespace lumina
         return col[0] > 0.0f || col[1] > 0.0f || col[2] > 0.0f;
     }
 
+    static float specular_luminance(const tinyobj::material_t &mat)
+    {
+        return 0.2126f * mat.specular[0] + 0.7152f * mat.specular[1] + 0.0722f * mat.specular[2];
+    }
+
+    static float diffuse_luminance(const tinyobj::material_t &mat)
+    {
+        return 0.2126f * mat.diffuse[0] + 0.7152f * mat.diffuse[1] + 0.0722f * mat.diffuse[2];
+    }
+
+    static float shininess_to_roughness(float shininess)
+    {
+        return std::clamp(1.0f - sqrtf(shininess / 1000.0f), 0.02f, 1.0f);
+    }
+
+    static void load_albedo_texture(Material &m, Scene &scene, const tinyobj::material_t &mat, const std::string &mtl_basedir)
+    {
+        if (mat.diffuse_texname.empty())
+            return;
+
+        std::string texname = mat.diffuse_texname;
+        std::replace(texname.begin(), texname.end(), '\\', '/');
+        bool is_absolute = (texname.size() >= 2 && texname[1] == ':') || texname[0] == '/';
+        std::string tex_path = is_absolute ? texname : mtl_basedir + texname;
+        m.albedo_tex = scene.texture_manager().load_texture(tex_path);
+        if (m.albedo_tex < 0 && is_absolute)
+        {
+            size_t slash = texname.find_last_of('/');
+            if (slash != std::string::npos)
+            {
+                std::string fallback = mtl_basedir + texname.substr(slash + 1);
+                m.albedo_tex = scene.texture_manager().load_texture(fallback);
+            }
+        }
+    }
+
     static int map_material(Scene &scene, const tinyobj::material_t &mat, const std::string &mtl_basedir)
     {
         Material m;
+
+        bool has_pbr = mat.metallic > 0.0f || mat.roughness > 0.0f;
 
         if (is_non_zero(mat.emission))
         {
@@ -30,17 +68,68 @@ namespace lumina
                 mat.emission[2] / magnitude);
             m = Material::emissive(color, magnitude);
         }
+        else if (has_pbr)
+        {
+            float3 color = make_float3(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
+            if (!is_non_zero(mat.diffuse))
+                color = make_float3(0.8f);
+            float roughness = std::clamp(mat.roughness, 0.02f, 1.0f);
+
+            if (mat.metallic >= 0.5f)
+            {
+                m = Material::metal(color, roughness);
+            }
+            else if (roughness < 1.0f)
+            {
+                m = Material::plastic(color, roughness, mat.ior > 0.0f ? mat.ior : 1.5f);
+            }
+            else
+            {
+                m = Material::diffuse(color);
+            }
+        }
         else if (mat.dissolve < 1.0f || mat.illum == 4 || mat.illum == 6 || mat.illum == 7)
         {
             float ior = mat.ior > 0.0f ? mat.ior : 1.5f;
             float roughness = mat.roughness > 0.0f ? mat.roughness : 0.0f;
+            float3 tint = make_float3(mat.transmittance[0], mat.transmittance[1], mat.transmittance[2]);
             m = Material::glass(ior, roughness);
+            if (is_non_zero(mat.transmittance))
+            {
+                m.albedo = tint;
+            }
+            else if (is_non_zero(mat.diffuse))
+            {
+                m.albedo = make_float3(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
+            }
         }
-        else if (is_non_zero(mat.specular) && mat.shininess > 100.0f && !is_non_zero(mat.diffuse))
+        else if (mat.illum == 3 || mat.illum == 5)
         {
-            float roughness = std::clamp(1.0f - sqrtf(mat.shininess / 1000.0f), 0.02f, 1.0f);
-            float3 color = make_float3(mat.specular[0], mat.specular[1], mat.specular[2]);
+            float roughness = mat.shininess > 0.0f ? shininess_to_roughness(mat.shininess) : 0.02f;
+            float3 color = is_non_zero(mat.specular)
+                               ? make_float3(mat.specular[0], mat.specular[1], mat.specular[2])
+                               : make_float3(0.9f);
             m = Material::metal(color, roughness);
+        }
+        else if (is_non_zero(mat.specular))
+        {
+            float spec_lum = specular_luminance(mat);
+            float diff_lum = diffuse_luminance(mat);
+
+            if (spec_lum > 0.5f && diff_lum < 0.05f)
+            {
+                float roughness = mat.shininess > 0.0f ? shininess_to_roughness(mat.shininess) : 0.1f;
+                float3 color = make_float3(mat.specular[0], mat.specular[1], mat.specular[2]);
+                m = Material::metal(color, roughness);
+            }
+            else
+            {
+                float3 color = make_float3(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
+                if (!is_non_zero(mat.diffuse))
+                    color = make_float3(0.8f);
+                float roughness = mat.shininess > 0.0f ? shininess_to_roughness(mat.shininess) : 0.5f;
+                m = Material::plastic(color, roughness, mat.ior > 0.0f ? mat.ior : 1.5f);
+            }
         }
         else
         {
@@ -52,14 +141,7 @@ namespace lumina
             m = Material::diffuse(color);
         }
 
-        if (!mat.diffuse_texname.empty())
-        {
-            std::string texname = mat.diffuse_texname;
-            std::replace(texname.begin(), texname.end(), '\\', '/');
-            bool is_absolute = (texname.size() >= 2 && texname[1] == ':') || texname[0] == '/';
-            std::string tex_path = is_absolute ? texname : mtl_basedir + texname;
-            m.albedo_tex = scene.texture_manager().load_texture(tex_path);
-        }
+        load_albedo_texture(m, scene, mat, mtl_basedir);
 
         return scene.add_material(m);
     }
