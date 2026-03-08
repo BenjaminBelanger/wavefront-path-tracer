@@ -157,7 +157,7 @@ namespace lumina
 
     __host__ __device__ inline float russian_roulette_prob(const float3 &throughput)
     {
-        return fminf(0.95f, max_component(throughput));
+        return fmaxf(0.05f, fminf(0.95f, max_component(throughput)));
     }
 
     __host__ __device__ inline float3 spherical_to_cartesian(float theta, float phi)
