@@ -288,7 +288,7 @@ namespace lumina
             {
 
                 sample.wi = make_float3(-wo_local.x, -wo_local.y, wo_local.z);
-                sample.f = make_float3(1.0f) * fabsf(sample.wi.z);
+                sample.f = material.albedo * fabsf(sample.wi.z);
                 sample.pdf = F;
                 sample.is_specular = true;
                 sample.is_transmission = false;
@@ -302,7 +302,7 @@ namespace lumina
                 {
 
                     sample.wi = make_float3(-wo_local.x, -wo_local.y, wo_local.z);
-                    sample.f = make_float3(1.0f) * fabsf(sample.wi.z);
+                    sample.f = material.albedo * fabsf(sample.wi.z);
                     sample.pdf = 1.0f;
                     sample.is_specular = true;
                     sample.is_transmission = false;
@@ -311,7 +311,7 @@ namespace lumina
                 {
                     sample.wi = entering ? refracted : -refracted;
 
-                    sample.f = make_float3(eta * eta) * fabsf(sample.wi.z);
+                    sample.f = material.albedo * (eta * eta) * fabsf(sample.wi.z);
                     sample.pdf = 1.0f - F;
                     sample.is_specular = true;
                     sample.is_transmission = true;

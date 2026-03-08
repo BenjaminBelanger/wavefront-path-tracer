@@ -3,6 +3,7 @@
 
 #include "obj_loader.cuh"
 #include "../core/math/matrix.cuh"
+#include "../core/math/spectral.cuh"
 
 #include <iostream>
 #include <algorithm>
@@ -15,6 +16,11 @@ namespace lumina
     static bool is_non_zero(const float col[3])
     {
         return col[0] > 0.0f || col[1] > 0.0f || col[2] > 0.0f;
+    }
+
+    static float3 linear_color(const float col[3])
+    {
+        return srgb_to_linear(make_float3(col[0], col[1], col[2]));
     }
 
     static float specular_luminance(const tinyobj::material_t &mat)
@@ -61,18 +67,14 @@ namespace lumina
 
         if (is_non_zero(mat.emission))
         {
-            float magnitude = std::max({mat.emission[0], mat.emission[1], mat.emission[2]});
-            float3 color = make_float3(
-                mat.emission[0] / magnitude,
-                mat.emission[1] / magnitude,
-                mat.emission[2] / magnitude);
+            float3 lin = linear_color(mat.emission);
+            float magnitude = fmaxf(fmaxf(lin.x, lin.y), lin.z);
+            float3 color = lin * (1.0f / magnitude);
             m = Material::emissive(color, magnitude);
         }
         else if (has_pbr)
         {
-            float3 color = make_float3(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
-            if (!is_non_zero(mat.diffuse))
-                color = make_float3(0.8f);
+            float3 color = is_non_zero(mat.diffuse) ? linear_color(mat.diffuse) : make_float3(0.8f);
             float roughness = std::clamp(mat.roughness, 0.02f, 1.0f);
 
             if (mat.metallic >= 0.5f)
@@ -92,23 +94,20 @@ namespace lumina
         {
             float ior = mat.ior > 0.0f ? mat.ior : 1.5f;
             float roughness = mat.roughness > 0.0f ? mat.roughness : 0.0f;
-            float3 tint = make_float3(mat.transmittance[0], mat.transmittance[1], mat.transmittance[2]);
             m = Material::glass(ior, roughness);
             if (is_non_zero(mat.transmittance))
             {
-                m.albedo = tint;
+                m.albedo = linear_color(mat.transmittance);
             }
             else if (is_non_zero(mat.diffuse))
             {
-                m.albedo = make_float3(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
+                m.albedo = linear_color(mat.diffuse);
             }
         }
         else if (mat.illum == 3 || mat.illum == 5)
         {
             float roughness = mat.shininess > 0.0f ? shininess_to_roughness(mat.shininess) : 0.02f;
-            float3 color = is_non_zero(mat.specular)
-                               ? make_float3(mat.specular[0], mat.specular[1], mat.specular[2])
-                               : make_float3(0.9f);
+            float3 color = is_non_zero(mat.specular) ? linear_color(mat.specular) : make_float3(0.9f);
             m = Material::metal(color, roughness);
         }
         else if (is_non_zero(mat.specular))
@@ -119,25 +118,18 @@ namespace lumina
             if (spec_lum > 0.5f && diff_lum < 0.05f)
             {
                 float roughness = mat.shininess > 0.0f ? shininess_to_roughness(mat.shininess) : 0.1f;
-                float3 color = make_float3(mat.specular[0], mat.specular[1], mat.specular[2]);
-                m = Material::metal(color, roughness);
+                m = Material::metal(linear_color(mat.specular), roughness);
             }
             else
             {
-                float3 color = make_float3(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
-                if (!is_non_zero(mat.diffuse))
-                    color = make_float3(0.8f);
+                float3 color = is_non_zero(mat.diffuse) ? linear_color(mat.diffuse) : make_float3(0.8f);
                 float roughness = mat.shininess > 0.0f ? shininess_to_roughness(mat.shininess) : 0.5f;
                 m = Material::plastic(color, roughness, mat.ior > 0.0f ? mat.ior : 1.5f);
             }
         }
         else
         {
-            float3 color = make_float3(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
-            if (color.x == 0.0f && color.y == 0.0f && color.z == 0.0f)
-            {
-                color = make_float3(0.8f);
-            }
+            float3 color = is_non_zero(mat.diffuse) ? linear_color(mat.diffuse) : make_float3(0.8f);
             m = Material::diffuse(color);
         }
 
