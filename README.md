@@ -9,7 +9,7 @@ A GPU-accelerated wavefront path tracer built from scratch in CUDA C++17. Render
 
 - **Wavefront path tracing** -- separates ray generation, intersection, shading, and accumulation into distinct GPU kernels for maximum occupancy and minimal warp divergence
 - **Structure-of-Arrays (SoA) memory layout** -- all per-path and per-hit data is stored in SoA form (`PathStateSoA`, `HitInfoSoA`, `ReservoirSoA`) with `__restrict__` pointer views for coalesced global memory access
-- **Physically-based material system** -- Lambertian, Oren-Nayar rough diffuse, GGX microfacet conductor (VNDF importance sampling), rough/smooth dielectric with Fresnel transmission, thin film interference, and emissive materials with spectral complex-IOR metals (gold, silver, copper, aluminum)
+- **Physically-based material system** -- Lambertian, Oren-Nayar rough diffuse, GGX microfacet conductor (VNDF importance sampling), rough/smooth dielectric with Fresnel transmission, plastic (diffuse + specular coat), thin film interference, and emissive materials with spectral complex-IOR metals (gold, silver, copper, aluminum)
 - **Spectral rendering** -- hero wavelength sampling across 380--780nm with CIE XYZ color matching functions and sRGB conversion; wavelength-dependent IOR via the Sellmeier equation (BK7, fused silica, SF11, diamond, sapphire, water); blackbody radiation from temperature
 - **OBJ mesh loading** -- import arbitrary triangle meshes with per-vertex normals, UV coordinates, optional normal recalculation, and configurable scale/transform
 - **HDRI environment mapping** -- HDR radiance environment maps with configurable intensity for image-based lighting
@@ -111,14 +111,14 @@ src/
     random/                 PCG32 RNG for device code
   geometry/
     bvh/                    BVH node layout, SAH builder, GPU traversal
-    primitives/             Triangle, Sphere, Ellipsoid, AABB
+    primitives/             Triangle, Sphere, AABB
   integrators/
     wavefront/              Wavefront kernels, path state (SoA), work queues
   lighting/
     restir/                 ReSTIR DI reservoirs, alias table sampling
   materials/
     bsdf/                   Lambert, Oren-Nayar, GGX conductor, dielectric,
-                            mirror, glass, thin film
+                            plastic, thin film, emission
     spectral/               Sellmeier equation, Cauchy dispersion, complex IOR,
                             blackbody radiation, metal spectral data
 external/
@@ -139,14 +139,13 @@ All path state is stored in Structure-of-Arrays layout rather than AoS. When a w
 
 | BSDF | Model | Sampling |
 |---|---|---|
-| Lambertian | Cosine-weighted diffuse | Cosine hemisphere sampling |
+| Lambert | Cosine-weighted diffuse | Cosine hemisphere sampling |
 | Oren-Nayar | Rough diffuse with angle-dependent reflectance | Cosine hemisphere sampling |
-| GGX Conductor | Microfacet with spectral complex-IOR Fresnel | VNDF (visible normal distribution function) |
-| Dielectric | Microfacet with Fresnel transmission | VNDF + refraction via Snell's law |
-| Rough Dielectric | GGX-based rough glass with transmission | VNDF + stochastic refraction |
-| Mirror | Perfect specular reflection | Delta distribution |
-| Glass | Smooth Fresnel reflection/refraction | Stochastic reflection vs. refraction |
+| Metal (GGX Conductor) | Microfacet with spectral complex-IOR Fresnel; perfect mirror at zero roughness | VNDF (visible normal distribution function) |
+| Dielectric | Smooth or rough glass with Fresnel reflection/transmission | VNDF + refraction via Snell's law |
+| Plastic | Diffuse substrate with specular GGX coat | Cosine hemisphere + VNDF |
 | Thin Film | Coherent thin film interference colors | Spectral interference superposition |
+| Emission | Emissive surface (area light) | N/A (light source) |
 
 GGX sampling uses the [Heitz 2018](https://jcgt.org/published/0007/04/01/) VNDF method for importance sampling the visible microfacet normals, which gives zero-variance weighting in the specular limit. Conductor materials support spectral complex IOR with built-in data for gold, silver, copper, and aluminum.
 
@@ -168,4 +167,4 @@ Implements reservoir-based importance sampling ([Bitterli et al. 2020](https://r
 
 ### Geometry
 
-Supported primitives include triangles, spheres, and ellipsoids. Triangles use watertight intersection with precomputed edge data and per-vertex normal/UV interpolation. Procedural shape generators (box, pyramid, torus, octahedron, UV sphere) are available for scene construction. Arbitrary meshes can be imported via OBJ loading with configurable scale and optional smooth normal recalculation.
+Supported primitives include triangles and spheres. Triangles use watertight intersection with precomputed edge data and per-vertex normal/UV interpolation. Procedural shape generators (box, pyramid, torus, octahedron, UV sphere) are available for scene construction. Arbitrary meshes can be imported via OBJ loading with configurable scale and optional smooth normal recalculation.

@@ -56,7 +56,7 @@ Each SoA struct owns `DeviceBuffer`s; the corresponding `View` struct holds raw 
 | `src/core/math/` | Vector/matrix ops, sampling utilities, spectral rendering helpers |
 | `src/core/memory/` | `DeviceBuffer`, `PinnedBuffer`, `ManagedBuffer` RAII wrappers + `CUDA_CHECK` macros |
 | `src/core/random/` | PCG32 RNG for device code |
-| `src/geometry/bvh/` | BVH node structure, SAH-based CPU builder (`lbvh_builder.cu`), GPU traversal |
+| `src/geometry/bvh/` | BVH node structure, SAH-based CPU builder (`bvh_builder.cu`), GPU traversal |
 | `src/geometry/primitives/` | Triangle, Sphere, AABB |
 | `src/integrators/wavefront/` | Wavefront kernels, path state, work queues with material sorting |
 | `src/lighting/restir/` | ReSTIR DI (reservoir-based importance sampling for direct illumination) |
