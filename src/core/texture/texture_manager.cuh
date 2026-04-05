@@ -36,7 +36,7 @@ namespace lumina
             return *this;
         }
 
-        int load_texture(const std::string &filepath);
+        int load_texture(const std::string &filepath, bool srgb = true);
         int load_hdr(const std::string &filepath);
 
         void upload();
