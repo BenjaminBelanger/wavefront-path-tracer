@@ -137,7 +137,7 @@ namespace lumina
                 {
                     const TrianglePrecomputed &tri = primitives[node.first_prim() + i];
                     float t, u, v;
-                    if (tri.intersect(ray, t, u, v) && t < closest_t)
+                    if (tri.intersect_watertight(ray, t, u, v) && t < closest_t)
                     {
                         closest_t = t;
                         t_hit = t;
@@ -204,7 +204,7 @@ namespace lumina
                 {
                     const TrianglePrecomputed &tri = primitives[node.first_prim() + i];
                     float t, u, v;
-                    if (tri.intersect(ray, t, u, v))
+                    if (tri.intersect_watertight(ray, t, u, v))
                     {
                         return true;
                     }
@@ -222,95 +222,6 @@ namespace lumina
         }
 
         return false;
-    }
-
-    __host__ __device__ inline uint32_t expand_bits(uint32_t v)
-    {
-        v = (v * 0x00010001u) & 0xFF0000FFu;
-        v = (v * 0x00000101u) & 0x0F00F00Fu;
-        v = (v * 0x00000011u) & 0xC30C30C3u;
-        v = (v * 0x00000005u) & 0x49249249u;
-        return v;
-    }
-
-    __host__ __device__ inline uint32_t morton_code_3d(float3 p)
-    {
-        p = clamp(p * 1024.0f, 0.0f, 1023.0f);
-        uint32_t x = expand_bits(static_cast<uint32_t>(p.x));
-        uint32_t y = expand_bits(static_cast<uint32_t>(p.y));
-        uint32_t z = expand_bits(static_cast<uint32_t>(p.z));
-        return (z << 2) | (y << 1) | x;
-    }
-
-    __device__ inline int clz_device(uint32_t x)
-    {
-        return __clz(x);
-    }
-
-    __host__ inline int clz_host(uint32_t x)
-    {
-        if (x == 0)
-            return 32;
-        int n = 0;
-        if ((x & 0xFFFF0000) == 0)
-        {
-            n += 16;
-            x <<= 16;
-        }
-        if ((x & 0xFF000000) == 0)
-        {
-            n += 8;
-            x <<= 8;
-        }
-        if ((x & 0xF0000000) == 0)
-        {
-            n += 4;
-            x <<= 4;
-        }
-        if ((x & 0xC0000000) == 0)
-        {
-            n += 2;
-            x <<= 2;
-        }
-        if ((x & 0x80000000) == 0)
-        {
-            n += 1;
-        }
-        return n;
-    }
-
-    __device__ inline int find_split(uint32_t *morton_codes, int first, int last)
-    {
-        uint32_t first_code = morton_codes[first];
-        uint32_t last_code = morton_codes[last];
-
-        if (first_code == last_code)
-        {
-            return (first + last) >> 1;
-        }
-
-        int common_prefix = __clz(first_code ^ last_code);
-
-        int split = first;
-        int step = last - first;
-
-        do
-        {
-            step = (step + 1) >> 1;
-            int new_split = split + step;
-
-            if (new_split < last)
-            {
-                uint32_t split_code = morton_codes[new_split];
-                int split_prefix = __clz(first_code ^ split_code);
-                if (split_prefix > common_prefix)
-                {
-                    split = new_split;
-                }
-            }
-        } while (step > 1);
-
-        return split;
     }
 
 }

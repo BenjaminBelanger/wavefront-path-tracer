@@ -25,12 +25,15 @@ namespace lumina
         }
     }
 
-    int TextureManager::load_texture(const std::string &filepath)
+    int TextureManager::load_texture(const std::string &filepath, bool srgb)
     {
         std::string normalized = filepath;
         std::replace(normalized.begin(), normalized.end(), '\\', '/');
+        std::string cache_key = normalized;
+        if (!srgb)
+            cache_key += "#linear";
 
-        auto it = texture_cache_.find(normalized);
+        auto it = texture_cache_.find(cache_key);
         if (it != texture_cache_.end())
         {
             return it->second;
@@ -49,10 +52,16 @@ namespace lumina
         std::vector<float4> linear_data(width * height);
         for (int i = 0; i < width * height; i++)
         {
-            float r = srgb_to_linear_channel(data[4 * i + 0] / 255.0f);
-            float g = srgb_to_linear_channel(data[4 * i + 1] / 255.0f);
-            float b = srgb_to_linear_channel(data[4 * i + 2] / 255.0f);
+            float r = data[4 * i + 0] / 255.0f;
+            float g = data[4 * i + 1] / 255.0f;
+            float b = data[4 * i + 2] / 255.0f;
             float a = data[4 * i + 3] / 255.0f;
+            if (srgb)
+            {
+                r = srgb_to_linear_channel(r);
+                g = srgb_to_linear_channel(g);
+                b = srgb_to_linear_channel(b);
+            }
             linear_data[i] = make_float4(r, g, b, a);
         }
 
@@ -81,9 +90,9 @@ namespace lumina
 
         int index = static_cast<int>(textures_.size());
         textures_.push_back({cuda_array, tex_obj});
-        texture_cache_[normalized] = index;
+        texture_cache_[cache_key] = index;
 
-        std::cout << "  Loaded texture [" << index << "]: " << normalized
+        std::cout << "  Loaded " << (srgb ? "sRGB" : "linear") << " texture [" << index << "]: " << filepath
                   << " (" << width << "x" << height << ")" << std::endl;
 
         return index;

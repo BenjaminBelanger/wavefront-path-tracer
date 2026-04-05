@@ -64,7 +64,7 @@ set(GEOMETRY_SOURCES
     src/geometry/primitives/sphere.cuh
     src/geometry/primitives/aabb.cuh
     src/geometry/bvh/bvh.cuh
-    src/geometry/bvh/lbvh_builder.cu
+    src/geometry/bvh/bvh_builder.cu
 )
 
 set(MATERIAL_SOURCES
