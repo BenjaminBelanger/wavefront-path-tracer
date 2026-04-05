@@ -173,7 +173,7 @@ namespace lumina
     __device__ inline BSDFSample sample_bsdf(
         const Material &material,
         const ShadingContext &ctx,
-        float u1, float u2)
+        float u1, float u2, float u3 = 0.5f)
     {
         float3 wo_local = ctx.to_local(ctx.wo);
 
@@ -272,6 +272,17 @@ namespace lumina
         }
         case MaterialType::Dielectric:
         {
+            if (material.roughness >= 0.01f)
+            {
+                GGXDielectricBSDF bsdf(material.ior, material.roughness);
+                BSDFSample sample = bsdf.sample(wo_local, u1, u2, u3);
+                if (sample.is_valid())
+                {
+                    sample.f = sample.f * material.albedo;
+                    sample.wi = ctx.to_world(sample.wi);
+                }
+                return sample;
+            }
 
             BSDFSample sample;
             if (wo_local.z == 0.0f)

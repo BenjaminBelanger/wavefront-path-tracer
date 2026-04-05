@@ -302,7 +302,7 @@ namespace lumina
             paths.set_throughput(path_idx, throughput);
         }
 
-        BSDFSample sample = sample_bsdf(material, ctx, rng.next_float(), rng.next_float());
+        BSDFSample sample = sample_bsdf(material, ctx, rng.next_float(), rng.next_float(), rng.next_float());
 
         if (!sample.is_valid())
         {
