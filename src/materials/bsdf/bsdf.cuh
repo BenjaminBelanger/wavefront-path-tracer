@@ -50,6 +50,7 @@ namespace lumina
         Plastic,
         Emission,
         OrenNayar,
+        ThinFilm,
         COUNT
     };
 
@@ -76,8 +77,11 @@ namespace lumina
 
         int spectral_data_idx;
 
+        float film_thickness;
+        float film_ior;
+
         __host__ __device__ Material()
-            : type(MaterialType::Lambert), albedo(make_float3(0.8f)), roughness(0.5f), anisotropy(0.0f), ior(1.5f), eta(make_float3(1.0f)), k(make_float3(0.0f)), emission(make_float3(0.0f)), emission_strength(0.0f), albedo_tex(-1), roughness_tex(-1), normal_tex(-1), spectral_data_idx(-1)
+            : type(MaterialType::Lambert), albedo(make_float3(0.8f)), roughness(0.5f), anisotropy(0.0f), ior(1.5f), eta(make_float3(1.0f)), k(make_float3(0.0f)), emission(make_float3(0.0f)), emission_strength(0.0f), albedo_tex(-1), roughness_tex(-1), normal_tex(-1), spectral_data_idx(-1), film_thickness(0.0f), film_ior(1.3f)
         {
         }
 
@@ -138,6 +142,17 @@ namespace lumina
             m.type = MaterialType::OrenNayar;
             m.albedo = color;
             m.roughness = sigma;
+            return m;
+        }
+
+        __host__ static Material thin_film(const float3 &substrate_color, float thickness_nm, float f_ior = 1.3f, float substrate_ior = 1.5f)
+        {
+            Material m;
+            m.type = MaterialType::ThinFilm;
+            m.albedo = substrate_color;
+            m.film_thickness = thickness_nm;
+            m.film_ior = f_ior;
+            m.ior = substrate_ior;
             return m;
         }
 
