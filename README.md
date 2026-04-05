@@ -106,6 +106,7 @@ src/
     math/                   Vector/matrix ops, sampling, spectral rendering
     memory/                 DeviceBuffer RAII wrappers, CUDA_CHECK macros
     random/                 PCG32 RNG for device code
+    texture/                Texture manager, CUDA texture objects, HDR/LDR loading
   geometry/
     bvh/                    BVH node layout, SAH builder, GPU traversal
     primitives/             Triangle, sphere helpers, AABB
