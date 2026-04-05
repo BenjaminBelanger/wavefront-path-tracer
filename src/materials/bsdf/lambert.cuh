@@ -189,6 +189,16 @@ namespace lumina
             }
             return sample;
         }
+        case MaterialType::OrenNayar:
+        {
+            OrenNayarBSDF bsdf(material.albedo, material.roughness);
+            BSDFSample sample = bsdf.sample(wo_local, u1, u2);
+            if (sample.is_valid())
+            {
+                sample.wi = ctx.to_world(sample.wi);
+            }
+            return sample;
+        }
         case MaterialType::Metal:
         {
 
@@ -363,6 +373,11 @@ namespace lumina
             LambertBSDF bsdf(material.albedo);
             return bsdf.evaluate(wo_local, wi_local);
         }
+        case MaterialType::OrenNayar:
+        {
+            OrenNayarBSDF bsdf(material.albedo, material.roughness);
+            return bsdf.evaluate(wo_local, wi_local);
+        }
         case MaterialType::Plastic:
         {
             if (wo_local.z <= 0.0f || wi_local.z <= 0.0f)
@@ -399,6 +414,11 @@ namespace lumina
         case MaterialType::Lambert:
         {
             LambertBSDF bsdf(material.albedo);
+            return bsdf.pdf(wo_local, wi_local);
+        }
+        case MaterialType::OrenNayar:
+        {
+            OrenNayarBSDF bsdf(material.albedo, material.roughness);
             return bsdf.pdf(wo_local, wi_local);
         }
         case MaterialType::Plastic:
