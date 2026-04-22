@@ -1,0 +1,75 @@
+# Build directories
+build/
+out/
+x64/
+Debug/
+Release/
+.vs/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Visual Studio
+*.vcxproj.user
+*.suo
+*.sln.docstates
+*.opensdf
+*.sdf
+*.cachefile
+*.VC.db
+*.VC.db-shm
+*.VC.db-wal
+*.opendb
+*.ipch/
+GPUProject/
+
+# Compiled files
+*.obj
+*.o
+*.a
+*.lib
+*.exe
+*.dll
+*.so
+*.dylib
+*.pdb
+*.ilk
+*.exp
+
+# CUDA
+*.cubin
+*.fatbin
+*.ptx
+*.gpu
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*~
+
+# Dependencies
+external/glfw/
+external/glad/
+
+# Assets (keep structure, ignore large files)
+assets/models/*.obj
+assets/models/*.fbx
+assets/textures/*.png
+assets/textures/*.jpg
+assets/textures/*.hdr
+!assets/models/.gitkeep
+!assets/textures/.gitkeep
+
+# Logs and profiling
+*.log
+*.nsight
+*.nvvp
+*.qdrep
+
+# OS
+.DS_Store
+Thumbs.db
