@@ -428,6 +428,12 @@ Scene create_demo_scene() {
     // Small blue sphere
     add_sphere(::make_float3(1.6f, 0.4f, 1.4f), 0.4f, blue_diffuse, 16);
 
+    // Scale the full Cornell setup up around the original room center.
+    // Increase/decrease this factor to tune how large the scene appears
+    // relative to the fixed camera.
+    const float scene_scale = 1.5f;
+    scene.scale_geometry(scene_scale, ::make_float3(2.5f, 2.5f, 2.5f));
+
     // Build BVH
     scene.build();
 

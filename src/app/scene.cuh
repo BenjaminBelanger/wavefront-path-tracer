@@ -95,6 +95,22 @@ public:
         spheres_.push_back(sphere);
     }
 
+    // Uniformly scale all scene geometry around a pivot point.
+    void scale_geometry(float scale, const float3& pivot) {
+        if (scale == 1.0f) return;
+
+        for (auto& tri : triangles_) {
+            tri.v0 = pivot + (tri.v0 - pivot) * scale;
+            tri.v1 = pivot + (tri.v1 - pivot) * scale;
+            tri.v2 = pivot + (tri.v2 - pivot) * scale;
+        }
+
+        for (auto& sphere : spheres_) {
+            sphere.center = pivot + (sphere.center - pivot) * scale;
+            sphere.radius *= scale;
+        }
+    }
+
     // Add materials
     int add_material(const Material& mat) {
         int id = static_cast<int>(materials_.size());
