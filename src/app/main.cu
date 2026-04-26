@@ -225,14 +225,18 @@ Scene create_demo_scene() {
     int white_diffuse = scene.add_material(Material::diffuse(::make_float3(0.73f, 0.73f, 0.73f)));
     int red_diffuse = scene.add_material(Material::diffuse(::make_float3(0.65f, 0.05f, 0.05f)));
     int green_diffuse = scene.add_material(Material::diffuse(::make_float3(0.12f, 0.45f, 0.15f)));
-    int light_mat = scene.add_material(Material::emissive(::make_float3(1.0f, 0.95f, 0.8f), 18.0f));
+    int light_mat = scene.add_material(Material::emissive(::make_float3(1.0f, 0.95f, 0.8f), 16.0f));
     int mirror_mat = scene.add_material(Material::metal(::make_float3(0.95f, 0.95f, 0.95f), 0.02f));
+    int chrome_mat = scene.add_material(Material::metal(::make_float3(0.92f, 0.94f, 0.98f), 0.05f));
     int gold_mat = scene.add_material(Material::metal(::make_float3(1.0f, 0.85f, 0.57f), 0.1f));
-    int glass_mat = scene.add_material(Material::glass(1.5f, 0.0f));
     int blue_diffuse = scene.add_material(Material::diffuse(::make_float3(0.2f, 0.3f, 0.8f)));
+    int coral_diffuse = scene.add_material(Material::diffuse(::make_float3(0.86f, 0.42f, 0.31f)));
+    int mint_diffuse = scene.add_material(Material::diffuse(::make_float3(0.42f, 0.86f, 0.74f)));
+    int obsidian_metal = scene.add_material(Material::metal(::make_float3(0.14f, 0.16f, 0.2f), 0.35f));
+    int cyan_metal = scene.add_material(Material::metal(::make_float3(0.5f, 0.9f, 0.96f), 0.08f));
 
     // Cornell box dimensions
-    float box_size = 5.0f;
+    float box_size = 7.0f;
 
     // Floor
     scene.add_triangle(Triangle(
@@ -305,7 +309,7 @@ Scene create_demo_scene() {
     ));
 
     // Light on ceiling
-    float light_size = 1.5f;
+    float light_size = 2.0f;
     float light_y = box_size - 0.01f;
     float light_center = box_size / 2.0f;
     scene.add_triangle(Triangle(
@@ -415,24 +419,162 @@ Scene create_demo_scene() {
         }
     };
 
-    // Add spheres
-    // Mirror sphere (left)
-    add_sphere(::make_float3(1.1f, 1.0f, 3.6f), 1.0f, mirror_mat, 24);
+    // Helper to add a 4-sided pyramid on the floor (open bottom).
+    auto add_pyramid = [&](float3 base_center, float base_size, float height, float angle, int mat_id) {
+        float c = cosf(angle);
+        float s = sinf(angle);
+        float h = base_size * 0.5f;
 
-    // Glass sphere (center)
-    add_sphere(::make_float3(2.6f, 0.8f, 2.2f), 0.8f, glass_mat, 24);
+        auto rotate = [c, s, base_center](float3 p) {
+            float x = p.x - base_center.x;
+            float z = p.z - base_center.z;
+            return ::make_float3(
+                base_center.x + c * x - s * z,
+                p.y,
+                base_center.z + s * x + c * z
+            );
+        };
 
-    // Gold sphere (right)
-    add_sphere(::make_float3(3.8f, 0.7f, 3.8f), 0.7f, gold_mat, 24);
+        float3 b0 = rotate(::make_float3(base_center.x - h, base_center.y, base_center.z - h));
+        float3 b1 = rotate(::make_float3(base_center.x + h, base_center.y, base_center.z - h));
+        float3 b2 = rotate(::make_float3(base_center.x + h, base_center.y, base_center.z + h));
+        float3 b3 = rotate(::make_float3(base_center.x - h, base_center.y, base_center.z + h));
+        float3 apex = ::make_float3(base_center.x, base_center.y + height, base_center.z);
 
-    // Small blue sphere
-    add_sphere(::make_float3(1.6f, 0.4f, 1.4f), 0.4f, blue_diffuse, 16);
+        scene.add_triangle(Triangle(b0, b1, apex, mat_id));
+        scene.add_triangle(Triangle(b1, b2, apex, mat_id));
+        scene.add_triangle(Triangle(b2, b3, apex, mat_id));
+        scene.add_triangle(Triangle(b3, b0, apex, mat_id));
+    };
 
-    // Scale the full Cornell setup up around the original room center.
-    // Increase/decrease this factor to tune how large the scene appears
-    // relative to the fixed camera.
-    const float scene_scale = 1.5f;
-    scene.scale_geometry(scene_scale, ::make_float3(2.5f, 2.5f, 2.5f));
+    // Helper to add a torus with smooth normals.
+    auto add_torus = [&](float3 center, float major_radius, float minor_radius, float y_angle,
+                         int mat_id, int seg_major = 28, int seg_minor = 14) {
+        float c = cosf(y_angle);
+        float s = sinf(y_angle);
+
+        auto rotate_y = [c, s](const float3& p) {
+            return ::make_float3(
+                c * p.x - s * p.z,
+                p.y,
+                s * p.x + c * p.z
+            );
+        };
+
+        auto add_smooth_torus_triangle = [&](const float3& p0, const float3& p1, const float3& p2,
+                                             const float3& n0, const float3& n1, const float3& n2) {
+            Triangle tri(p0, p1, p2, mat_id);
+            tri.n0 = normalize(n0);
+            tri.n1 = normalize(n1);
+            tri.n2 = normalize(n2);
+            scene.add_triangle(tri);
+        };
+
+        for (int i = 0; i < seg_major; ++i) {
+            int i1 = (i + 1) % seg_major;
+            float u0 = TWO_PI * float(i) / float(seg_major);
+            float u1 = TWO_PI * float(i1) / float(seg_major);
+
+            for (int j = 0; j < seg_minor; ++j) {
+                int j1 = (j + 1) % seg_minor;
+                float v0 = TWO_PI * float(j) / float(seg_minor);
+                float v1 = TWO_PI * float(j1) / float(seg_minor);
+
+                auto torus_pos = [&](float u, float v) {
+                    float ring = major_radius + minor_radius * cosf(v);
+                    return ::make_float3(
+                        ring * cosf(u),
+                        minor_radius * sinf(v),
+                        ring * sinf(u)
+                    );
+                };
+
+                auto torus_normal = [&](float u, float v) {
+                    return normalize(::make_float3(
+                        cosf(u) * cosf(v),
+                        sinf(v),
+                        sinf(u) * cosf(v)
+                    ));
+                };
+
+                float3 lp00 = torus_pos(u0, v0);
+                float3 lp10 = torus_pos(u1, v0);
+                float3 lp01 = torus_pos(u0, v1);
+                float3 lp11 = torus_pos(u1, v1);
+
+                float3 ln00 = torus_normal(u0, v0);
+                float3 ln10 = torus_normal(u1, v0);
+                float3 ln01 = torus_normal(u0, v1);
+                float3 ln11 = torus_normal(u1, v1);
+
+                float3 p00 = center + rotate_y(lp00);
+                float3 p10 = center + rotate_y(lp10);
+                float3 p01 = center + rotate_y(lp01);
+                float3 p11 = center + rotate_y(lp11);
+
+                float3 n00 = rotate_y(ln00);
+                float3 n10 = rotate_y(ln10);
+                float3 n01 = rotate_y(ln01);
+                float3 n11 = rotate_y(ln11);
+
+                add_smooth_torus_triangle(p00, p10, p01, n00, n10, n01);
+                add_smooth_torus_triangle(p10, p11, p01, n10, n11, n01);
+            }
+        }
+    };
+
+    // Helper to add an octahedron.
+    auto add_octahedron = [&](float3 center, float radius, float angle, int mat_id) {
+        float c = cosf(angle);
+        float s = sinf(angle);
+
+        auto rotate_y = [c, s, center](float3 p) {
+            float x = p.x - center.x;
+            float z = p.z - center.z;
+            return ::make_float3(
+                center.x + c * x - s * z,
+                p.y,
+                center.z + s * x + c * z
+            );
+        };
+
+        float3 top = ::make_float3(center.x, center.y + radius, center.z);
+        float3 bottom = ::make_float3(center.x, center.y - radius, center.z);
+
+        float3 m0 = rotate_y(::make_float3(center.x + radius, center.y, center.z));
+        float3 m1 = rotate_y(::make_float3(center.x, center.y, center.z + radius));
+        float3 m2 = rotate_y(::make_float3(center.x - radius, center.y, center.z));
+        float3 m3 = rotate_y(::make_float3(center.x, center.y, center.z - radius));
+
+        scene.add_triangle(Triangle(top, m0, m1, mat_id));
+        scene.add_triangle(Triangle(top, m1, m2, mat_id));
+        scene.add_triangle(Triangle(top, m2, m3, mat_id));
+        scene.add_triangle(Triangle(top, m3, m0, mat_id));
+
+        scene.add_triangle(Triangle(bottom, m1, m0, mat_id));
+        scene.add_triangle(Triangle(bottom, m2, m1, mat_id));
+        scene.add_triangle(Triangle(bottom, m3, m2, mat_id));
+        scene.add_triangle(Triangle(bottom, m0, m3, mat_id));
+    };
+
+    // Main hero objects
+    add_sphere(::make_float3(1.45f, 1.0f, 4.8f), 1.0f, mirror_mat, 24);
+    add_sphere(::make_float3(3.45f, 0.9f, 2.35f), 0.9f, chrome_mat, 24);
+    add_sphere(::make_float3(5.35f, 0.75f, 4.65f), 0.75f, gold_mat, 24);
+    add_sphere(::make_float3(1.9f, 0.42f, 1.65f), 0.42f, blue_diffuse, 16);
+
+    // New playful shapes
+    add_pyramid(::make_float3(5.45f, 0.0f, 1.95f), 1.0f, 1.35f, 0.42f, coral_diffuse);
+    add_octahedron(::make_float3(2.55f, 1.1f, 3.25f), 0.62f, 0.5f, mint_diffuse);
+    add_torus(::make_float3(4.05f, 1.65f, 3.8f), 0.78f, 0.24f, 0.35f, cyan_metal, 24, 12);
+
+    // Stacked blocks in the back-right corner
+    add_box(::make_float3(5.95f, 0.35f, 5.55f), ::make_float3(1.0f, 0.7f, 1.0f), 0.35f, obsidian_metal);
+    add_box(::make_float3(5.95f, 0.92f, 5.55f), ::make_float3(0.68f, 0.44f, 0.68f), -0.2f, obsidian_metal);
+
+    // Keep global scene scaling as a single tuning knob.
+    const float scene_scale = 1.0f;
+    scene.scale_geometry(scene_scale, ::make_float3(box_size * 0.5f, box_size * 0.5f, box_size * 0.5f));
 
     // Build BVH
     scene.build();
@@ -494,8 +636,8 @@ public:
 
         // Initialize camera controller
         controller_.camera.look_at(
-            ::make_float3(2.5f, 2.5f, -5.0f),
-            ::make_float3(2.5f, 2.0f, 2.5f),
+            ::make_float3(3.5f, 3.1f, -7.2f),
+            ::make_float3(3.5f, 2.2f, 3.5f),
             ::make_float3(0.0f, 1.0f, 0.0f)
         );
         controller_.camera.fov = PI / 4.0f;
