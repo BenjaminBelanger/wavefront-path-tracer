@@ -229,11 +229,14 @@ Scene create_demo_scene() {
     int mirror_mat = scene.add_material(Material::metal(::make_float3(0.95f, 0.95f, 0.95f), 0.02f));
     int chrome_mat = scene.add_material(Material::metal(::make_float3(0.92f, 0.94f, 0.98f), 0.05f));
     int gold_mat = scene.add_material(Material::metal(::make_float3(1.0f, 0.85f, 0.57f), 0.1f));
-    int blue_diffuse = scene.add_material(Material::diffuse(::make_float3(0.2f, 0.3f, 0.8f)));
     int coral_diffuse = scene.add_material(Material::diffuse(::make_float3(0.86f, 0.42f, 0.31f)));
-    int mint_diffuse = scene.add_material(Material::diffuse(::make_float3(0.42f, 0.86f, 0.74f)));
     int obsidian_metal = scene.add_material(Material::metal(::make_float3(0.14f, 0.16f, 0.2f), 0.35f));
-    int cyan_metal = scene.add_material(Material::metal(::make_float3(0.5f, 0.9f, 0.96f), 0.08f));
+    int velvet_violet = scene.add_material(Material::diffuse(::make_float3(0.44f, 0.24f, 0.64f)));
+    int mango_diffuse = scene.add_material(Material::diffuse(::make_float3(0.94f, 0.62f, 0.2f)));
+    int rose_gold_metal = scene.add_material(Material::metal(::make_float3(0.96f, 0.67f, 0.56f), 0.16f));
+    int pearl_metal = scene.add_material(Material::metal(::make_float3(0.92f, 0.9f, 0.98f), 0.12f));
+    int neon_pink_light = scene.add_material(Material::emissive(::make_float3(1.0f, 0.2f, 0.7f), 3.5f));
+    int electric_blue_light = scene.add_material(Material::emissive(::make_float3(0.2f, 0.75f, 1.0f), 3.0f));
 
     // Cornell box dimensions
     float box_size = 7.0f;
@@ -323,6 +326,32 @@ Scene create_demo_scene() {
         ::make_float3(light_center + light_size/2, light_y, light_center + light_size/2),
         ::make_float3(light_center - light_size/2, light_y, light_center + light_size/2),
         light_mat
+    ));
+
+    // Neon accent panels on the back wall
+    scene.add_triangle(Triangle(
+        ::make_float3(1.0f, 2.0f, box_size - 0.01f),
+        ::make_float3(2.1f, 2.0f, box_size - 0.01f),
+        ::make_float3(2.1f, 3.5f, box_size - 0.01f),
+        neon_pink_light
+    ));
+    scene.add_triangle(Triangle(
+        ::make_float3(1.0f, 2.0f, box_size - 0.01f),
+        ::make_float3(2.1f, 3.5f, box_size - 0.01f),
+        ::make_float3(1.0f, 3.5f, box_size - 0.01f),
+        neon_pink_light
+    ));
+    scene.add_triangle(Triangle(
+        ::make_float3(4.9f, 1.7f, box_size - 0.01f),
+        ::make_float3(6.1f, 1.7f, box_size - 0.01f),
+        ::make_float3(6.1f, 2.8f, box_size - 0.01f),
+        electric_blue_light
+    ));
+    scene.add_triangle(Triangle(
+        ::make_float3(4.9f, 1.7f, box_size - 0.01f),
+        ::make_float3(6.1f, 2.8f, box_size - 0.01f),
+        ::make_float3(4.9f, 2.8f, box_size - 0.01f),
+        electric_blue_light
     ));
 
     // Helper to add a box
@@ -561,16 +590,16 @@ Scene create_demo_scene() {
     add_sphere(::make_float3(1.45f, 1.0f, 4.8f), 1.0f, mirror_mat, 24);
     add_sphere(::make_float3(3.45f, 0.9f, 2.35f), 0.9f, chrome_mat, 24);
     add_sphere(::make_float3(5.35f, 0.75f, 4.65f), 0.75f, gold_mat, 24);
-    add_sphere(::make_float3(1.9f, 0.42f, 1.65f), 0.42f, blue_diffuse, 16);
+    add_sphere(::make_float3(1.9f, 0.42f, 1.65f), 0.42f, velvet_violet, 16);
 
     // New playful shapes
     add_pyramid(::make_float3(5.45f, 0.0f, 1.95f), 1.0f, 1.35f, 0.42f, coral_diffuse);
-    add_octahedron(::make_float3(2.55f, 1.1f, 3.25f), 0.62f, 0.5f, mint_diffuse);
-    add_torus(::make_float3(4.05f, 1.65f, 3.8f), 0.78f, 0.24f, 0.35f, cyan_metal, 24, 12);
+    add_octahedron(::make_float3(2.55f, 1.1f, 3.25f), 0.62f, 0.5f, mango_diffuse);
+    add_torus(::make_float3(4.05f, 1.65f, 3.8f), 0.78f, 0.24f, 0.35f, pearl_metal, 24, 12);
 
     // Stacked blocks in the back-right corner
     add_box(::make_float3(5.95f, 0.35f, 5.55f), ::make_float3(1.0f, 0.7f, 1.0f), 0.35f, obsidian_metal);
-    add_box(::make_float3(5.95f, 0.92f, 5.55f), ::make_float3(0.68f, 0.44f, 0.68f), -0.2f, obsidian_metal);
+    add_box(::make_float3(5.95f, 0.92f, 5.55f), ::make_float3(0.68f, 0.44f, 0.68f), -0.2f, rose_gold_metal);
 
     // Keep global scene scaling as a single tuning knob.
     const float scene_scale = 1.0f;
