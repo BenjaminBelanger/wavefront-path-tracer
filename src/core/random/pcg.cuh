@@ -51,7 +51,7 @@ public:
         uint32_t xorshifted = static_cast<uint32_t>(((oldstate >> 18) ^ oldstate) >> 27);
         uint32_t rot = static_cast<uint32_t>(oldstate >> 59);
 
-        return (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
+        return (xorshifted >> rot) | (xorshifted << ((32u - rot) & 31u));
     }
 
     // Generate uniform float in [0, 1)

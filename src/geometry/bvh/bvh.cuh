@@ -131,7 +131,6 @@ __device__ inline bool traverse_bvh(
 
         // Test ray against node bounds
         AABB box = node.bounds();
-        float t_near, t_far;
         if (!box.intersect_fast(ray.origin, inv_dir, ray.t_min, closest_t)) {
             continue;
         }
