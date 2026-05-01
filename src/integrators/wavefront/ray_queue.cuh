@@ -47,6 +47,99 @@ namespace lumina
         return MaterialQueueView{queue.indices.data(), queue.count.data()};
     }
 
+    struct ShadowRaySoA
+    {
+        DeviceBuffer<float> origin_x, origin_y, origin_z;
+        DeviceBuffer<float> dir_x, dir_y, dir_z;
+        DeviceBuffer<float> t_max;
+        DeviceBuffer<float> contrib_x, contrib_y, contrib_z;
+        DeviceBuffer<int> path_idx;
+        DeviceBuffer<unsigned int> count;
+
+        void resize(size_t max_rays)
+        {
+            origin_x.resize(max_rays);
+            origin_y.resize(max_rays);
+            origin_z.resize(max_rays);
+            dir_x.resize(max_rays);
+            dir_y.resize(max_rays);
+            dir_z.resize(max_rays);
+            t_max.resize(max_rays);
+            contrib_x.resize(max_rays);
+            contrib_y.resize(max_rays);
+            contrib_z.resize(max_rays);
+            path_idx.resize(max_rays);
+            count.resize(1);
+        }
+
+        void clear()
+        {
+            CUDA_CHECK(cudaMemset(count.data(), 0, sizeof(unsigned int)));
+        }
+
+        unsigned int get_count() const
+        {
+            unsigned int h_count;
+            CUDA_CHECK(cudaMemcpy(&h_count, count.data(), sizeof(unsigned int), cudaMemcpyDeviceToHost));
+            return h_count;
+        }
+    };
+
+    struct ShadowRayView
+    {
+        float *__restrict__ origin_x;
+        float *__restrict__ origin_y;
+        float *__restrict__ origin_z;
+        float *__restrict__ dir_x;
+        float *__restrict__ dir_y;
+        float *__restrict__ dir_z;
+        float *__restrict__ t_max;
+        float *__restrict__ contrib_x;
+        float *__restrict__ contrib_y;
+        float *__restrict__ contrib_z;
+        int *__restrict__ path_idx;
+        unsigned int *__restrict__ count;
+
+        __device__ int push(int pidx,
+                            const float3 &origin,
+                            const float3 &dir,
+                            float tmax,
+                            const float3 &contrib)
+        {
+            unsigned int slot = atomicAdd(count, 1);
+            origin_x[slot] = origin.x;
+            origin_y[slot] = origin.y;
+            origin_z[slot] = origin.z;
+            dir_x[slot] = dir.x;
+            dir_y[slot] = dir.y;
+            dir_z[slot] = dir.z;
+            t_max[slot] = tmax;
+            contrib_x[slot] = contrib.x;
+            contrib_y[slot] = contrib.y;
+            contrib_z[slot] = contrib.z;
+            path_idx[slot] = pidx;
+            return static_cast<int>(slot);
+        }
+    };
+
+    inline ShadowRayView make_view(ShadowRaySoA &q)
+    {
+        ShadowRayView v;
+        v.origin_x = q.origin_x.data();
+        v.origin_y = q.origin_y.data();
+        v.origin_z = q.origin_z.data();
+        v.dir_x = q.dir_x.data();
+        v.dir_y = q.dir_y.data();
+        v.dir_z = q.dir_z.data();
+        v.t_max = q.t_max.data();
+        v.contrib_x = q.contrib_x.data();
+        v.contrib_y = q.contrib_y.data();
+        v.contrib_z = q.contrib_z.data();
+        v.path_idx = q.path_idx.data();
+        v.count = q.count.data();
+        return v;
+    }
+
     enum class QueueType
     {
         RayGenerate,

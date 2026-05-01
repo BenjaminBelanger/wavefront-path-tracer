@@ -43,6 +43,8 @@ namespace lumina
         DeviceBuffer<uint32_t> flags;
         DeviceBuffer<int> material_id;
 
+        DeviceBuffer<float> last_bsdf_pdf;
+
         DeviceBuffer<PCG32> rng;
 
         DeviceBuffer<float> wavelengths[NUM_WAVELENGTHS];
@@ -72,6 +74,8 @@ namespace lumina
             depth.resize(count);
             flags.resize(count);
             material_id.resize(count);
+
+            last_bsdf_pdf.resize(count);
 
             rng.resize(count);
 
@@ -109,6 +113,8 @@ namespace lumina
         int *__restrict__ depth;
         uint32_t *__restrict__ flags;
         int *__restrict__ material_id;
+
+        float *__restrict__ last_bsdf_pdf;
 
         PCG32 *__restrict__ rng;
 
@@ -241,6 +247,7 @@ namespace lumina
         view.depth = state.depth.data();
         view.flags = state.flags.data();
         view.material_id = state.material_id.data();
+        view.last_bsdf_pdf = state.last_bsdf_pdf.data();
         view.rng = state.rng.data();
 
         for (int i = 0; i < NUM_WAVELENGTHS; i++)

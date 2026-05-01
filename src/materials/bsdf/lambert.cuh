@@ -35,7 +35,7 @@ namespace lumina
             sample.wi = sample_hemisphere_cosine(u1, u2);
             sample.pdf = pdf_hemisphere_cosine(sample.wi.z);
 
-            sample.f = albedo * sample.wi.z;
+            sample.f = albedo * INV_PI * sample.wi.z;
 
             sample.is_specular = false;
             sample.is_transmission = false;
@@ -429,6 +429,29 @@ namespace lumina
             float3 diff = material.albedo * INV_PI * (1.0f - F);
             return spec + diff;
         }
+        case MaterialType::Metal:
+        {
+            if (material.roughness < 0.01f)
+                return make_float3(0.0f);
+            if (wo_local.z <= 0.0f || wi_local.z <= 0.0f)
+                return make_float3(0.0f);
+            float alpha = material.roughness * material.roughness;
+            float3 h = normalize(wo_local + wi_local);
+            if (h.z <= 0.0f)
+                return make_float3(0.0f);
+            float D = ggx_d(h.z, alpha);
+            float G = ggx_g(wo_local.z, wi_local.z, alpha);
+            float3 F = fresnel_schlick(dot(wo_local, h), material.albedo);
+            return F * D * G / (4.0f * wo_local.z * wi_local.z);
+        }
+        case MaterialType::Dielectric:
+        {
+            return make_float3(0.0f);
+        }
+        case MaterialType::Emission:
+        {
+            return make_float3(0.0f);
+        }
         case MaterialType::ThinFilm:
         {
             if (wo_local.z <= 0.0f || wi_local.z <= 0.0f)
@@ -478,6 +501,23 @@ namespace lumina
             float spec_pdf = ggx_vndf_pdf(wo_local, h, alpha) / (4.0f * dot(wo_local, h));
             float diff_pdf = pdf_hemisphere_cosine(wi_local.z);
             return F * spec_pdf + (1.0f - F) * diff_pdf;
+        }
+        case MaterialType::Metal:
+        {
+            if (material.roughness < 0.01f)
+                return 0.0f;
+            if (wo_local.z <= 0.0f || wi_local.z <= 0.0f)
+                return 0.0f;
+            float alpha = material.roughness * material.roughness;
+            float3 h = normalize(wo_local + wi_local);
+            if (h.z <= 0.0f)
+                return 0.0f;
+            return ggx_vndf_pdf(wo_local, h, alpha) / (4.0f * dot(wo_local, h));
+        }
+        case MaterialType::Dielectric:
+        case MaterialType::Emission:
+        {
+            return 0.0f;
         }
         case MaterialType::ThinFilm:
         {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "../../core/math/vector.cuh"
 #include "../../core/memory/device_buffer.cuh"
 #include "../primitives/aabb.cuh"
@@ -58,6 +60,8 @@ namespace lumina
         const Triangle *primitives() const { return primitives_.data(); }
         const int *primitive_indices() const { return prim_indices_.data(); }
 
+        const Triangle *primitives_host() const { return primitives_host_.data(); }
+
         BVHNode *nodes_ptr() { return nodes_.data(); }
         Triangle *primitives_ptr() { return primitives_.data(); }
         int *primitive_indices_ptr() { return prim_indices_.data(); }
@@ -74,6 +78,8 @@ namespace lumina
         DeviceBuffer<Triangle> primitives_;
         DeviceBuffer<TrianglePrecomputed> precomputed_;
         DeviceBuffer<int> prim_indices_;
+
+        std::vector<Triangle> primitives_host_;
 
         int num_nodes_;
         int num_primitives_;

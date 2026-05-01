@@ -7,6 +7,7 @@
 #include "../geometry/primitives/sphere.cuh"
 #include "../materials/bsdf/bsdf.cuh"
 #include "../core/texture/texture_manager.cuh"
+#include "../lighting/light_sampling.cuh"
 #include <vector>
 
 namespace lumina
@@ -238,6 +239,14 @@ namespace lumina
                 spheres_gpu_.upload(spheres_.data(), spheres_.size());
             }
 
+            if (!triangles_.empty() && !materials_.empty())
+            {
+                light_table_.build(bvh_.primitives_host(),
+                                   bvh_.num_primitives(),
+                                   materials_.data(),
+                                   static_cast<int>(materials_.size()));
+            }
+
             texture_manager_.upload();
         }
 
@@ -247,6 +256,9 @@ namespace lumina
         const Material *materials() const { return materials_gpu_.data(); }
         const Light *lights() const { return lights_gpu_.data(); }
         const Sphere *spheres() const { return spheres_gpu_.data(); }
+
+        LightTableView light_table() const { return light_table_.view(); }
+        int num_emissive_triangles() const { return light_table_.count(); }
 
         int num_triangles() const { return static_cast<int>(triangles_.size()); }
         int num_materials() const { return static_cast<int>(materials_.size()); }
@@ -397,6 +409,7 @@ namespace lumina
         DeviceBuffer<Light> lights_gpu_;
         DeviceBuffer<Sphere> spheres_gpu_;
         TextureManager texture_manager_;
+        LightTable light_table_;
         int env_map_index_ = -1;
         float env_map_intensity_ = 2.0f;
     };
