@@ -104,6 +104,8 @@ set(APP_SOURCES
     src/app/window_runtime.cpp
     src/app/demo_scene.cuh
     src/app/demo_scene.cu
+    src/app/scene_shapes.cuh
+    src/app/scene_shapes.cu
     src/app/main.cu
 )
 
