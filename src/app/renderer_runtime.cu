@@ -77,7 +77,6 @@ struct InteractiveRenderer::Impl {
 
     DeviceBuffer<float4> accumulation_buffer;
     DeviceBuffer<int> sample_count;
-    DeviceBuffer<uchar4> display_buffer;
     DeviceBuffer<int> initial_active;
 
     Impl(int width_in, int height_in)
@@ -98,7 +97,6 @@ struct InteractiveRenderer::Impl {
         // Allocate framebuffer.
         accumulation_buffer.resize(num_pixels);
         sample_count.resize(num_pixels);
-        display_buffer.resize(num_pixels);
 
         // Allocate initial active path buffer.
         initial_active.resize(num_pixels);
@@ -191,15 +189,10 @@ void InteractiveRenderer::render_frame(const Camera& camera, const Scene& scene)
     impl_->total_samples++;
 }
 
-void InteractiveRenderer::tonemap() {
-    launch_tonemap(impl_->accumulation_buffer.data(), impl_->display_buffer.data(),
+void InteractiveRenderer::tonemap_to_buffer(uchar4* device_buffer) {
+    launch_tonemap(impl_->accumulation_buffer.data(), device_buffer,
                    impl_->width, impl_->height, impl_->exposure);
     CUDA_CHECK_LAST();
-}
-
-void InteractiveRenderer::download_display(uchar4* host_buffer) {
-    CUDA_CHECK(cudaMemcpy(host_buffer, impl_->display_buffer.data(),
-                          impl_->num_pixels * sizeof(uchar4), cudaMemcpyDeviceToHost));
 }
 
 int InteractiveRenderer::total_samples() const {

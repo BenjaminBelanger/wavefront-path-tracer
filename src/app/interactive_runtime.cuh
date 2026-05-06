@@ -1,12 +1,11 @@
 #pragma once
 
-#include <vector>
-
 #include <cuda_runtime.h>
 
 #include "camera.cuh"
 
 struct GLFWwindow;
+struct cudaGraphicsResource;
 
 namespace wpt {
 
@@ -21,8 +20,7 @@ public:
 
     void reset_accumulation();
     void render_frame(const Camera& camera, const Scene& scene);
-    void tonemap();
-    void download_display(uchar4* host_buffer);
+    void tonemap_to_buffer(uchar4* device_buffer);
 
     int total_samples() const;
     float& exposure();
@@ -61,7 +59,8 @@ private:
     unsigned int vao_;
     unsigned int vbo_;
     unsigned int texture_;
-    std::vector<unsigned char> pixel_buffer_;
+    unsigned int pbo_;
+    cudaGraphicsResource* cuda_pbo_resource_;
     CameraController controller_;
     bool camera_changed_;
     InteractiveRenderer* renderer_;
