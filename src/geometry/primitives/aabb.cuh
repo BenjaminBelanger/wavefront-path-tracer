@@ -4,9 +4,9 @@
 
 namespace wpt {
 
-// =============================================================================
-// Axis-Aligned Bounding Box
-// =============================================================================
+
+
+
 
 struct AABB {
     float3 min_bound;
@@ -95,8 +95,8 @@ struct AABB {
                min_bound.z <= other.max_bound.z && max_bound.z >= other.min_bound.z;
     }
 
-    // Slab method ray-AABB intersection
-    // Returns true if ray intersects, updates t_near and t_far
+    
+    
     __host__ __device__ bool intersect(const Ray& ray, float& t_near, float& t_far) const {
         float3 inv_dir = make_float3(1.0f / ray.direction.x, 1.0f / ray.direction.y, 1.0f / ray.direction.z);
 
@@ -112,7 +112,7 @@ struct AABB {
         return t_near <= t_far;
     }
 
-    // Fast ray-AABB test (no t values returned, just hit/miss)
+    
     __host__ __device__ bool intersect_fast(const float3& origin, const float3& inv_dir,
                                             float t_min, float t_max) const {
         float3 t0 = (min_bound - origin) * inv_dir;
@@ -136,4 +136,4 @@ __host__ __device__ inline AABB intersection_aabb(const AABB& a, const AABB& b) 
     return AABB(max(a.min_bound, b.min_bound), min(a.max_bound, b.max_bound));
 }
 
-} // namespace wpt
+} 

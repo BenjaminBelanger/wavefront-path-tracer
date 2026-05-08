@@ -5,11 +5,11 @@
 
 namespace wpt {
 
-// =============================================================================
-// SoA (Structure of Arrays) Containers for Coalesced Memory Access
-// =============================================================================
 
-// SoA version of float3 for coalesced memory access
+
+
+
+
 struct Float3SoA {
     DeviceBuffer<float> x;
     DeviceBuffer<float> y;
@@ -30,7 +30,7 @@ struct Float3SoA {
     size_t size() const { return x.size(); }
 };
 
-// Device-side accessor for Float3SoA
+
 struct Float3SoAView {
     float* __restrict__ x;
     float* __restrict__ y;
@@ -63,7 +63,7 @@ inline Float3SoAView make_view(Float3SoA& soa) {
     return Float3SoAView{soa.x.data(), soa.y.data(), soa.z.data()};
 }
 
-// SoA version of float4 for coalesced memory access
+
 struct Float4SoA {
     DeviceBuffer<float> x;
     DeviceBuffer<float> y;
@@ -109,22 +109,22 @@ inline Float4SoAView make_view(Float4SoA& soa) {
     return Float4SoAView{soa.x.data(), soa.y.data(), soa.z.data(), soa.w.data()};
 }
 
-// =============================================================================
-// Ray SoA Layout - Critical for Wavefront Path Tracer
-// =============================================================================
+
+
+
 
 struct RaysSoA {
-    // Origin
+    
     DeviceBuffer<float> origin_x;
     DeviceBuffer<float> origin_y;
     DeviceBuffer<float> origin_z;
 
-    // Direction
+    
     DeviceBuffer<float> dir_x;
     DeviceBuffer<float> dir_y;
     DeviceBuffer<float> dir_z;
 
-    // t_min and t_max
+    
     DeviceBuffer<float> t_min;
     DeviceBuffer<float> t_max;
 
@@ -189,16 +189,16 @@ inline RaysSoAView make_view(RaysSoA& rays) {
     };
 }
 
-// =============================================================================
-// Hit Info SoA Layout
-// =============================================================================
+
+
+
 
 struct HitsSoA {
-    DeviceBuffer<float> t;          // Hit distance (-1 for miss)
-    DeviceBuffer<int> prim_id;      // Primitive ID
-    DeviceBuffer<int> material_id;  // Material ID
-    DeviceBuffer<float> u;          // Barycentric u
-    DeviceBuffer<float> v;          // Barycentric v
+    DeviceBuffer<float> t;          
+    DeviceBuffer<int> prim_id;      
+    DeviceBuffer<int> material_id;  
+    DeviceBuffer<float> u;          
+    DeviceBuffer<float> v;          
 
     void resize(size_t count) {
         t.resize(count);
@@ -267,9 +267,9 @@ inline HitsSoAView make_view(HitsSoA& hits) {
     };
 }
 
-// =============================================================================
-// Atomic Counter for Queue Management
-// =============================================================================
+
+
+
 
 class AtomicCounter {
 public:
@@ -297,7 +297,7 @@ public:
 
     unsigned int* ptr() { return counter_; }
 
-    // Device-side atomic increment
+    
     __device__ unsigned int increment() {
         return atomicAdd(counter_, 1);
     }
@@ -306,4 +306,4 @@ private:
     unsigned int* counter_;
 };
 
-} // namespace wpt
+} 

@@ -4,16 +4,16 @@
 
 namespace wpt {
 
-// =============================================================================
-// 4x4 Matrix (Column-Major Storage)
-// =============================================================================
+
+
+
 
 struct Matrix4x4 {
-    float m[16];  // Column-major: m[col*4 + row]
+    float m[16];  
 
     __host__ __device__ Matrix4x4() {
         for (int i = 0; i < 16; i++) m[i] = 0.0f;
-        m[0] = m[5] = m[10] = m[15] = 1.0f;  // Identity
+        m[0] = m[5] = m[10] = m[15] = 1.0f;  
     }
 
     __host__ __device__ static Matrix4x4 identity() {
@@ -141,7 +141,7 @@ __host__ __device__ inline Matrix4x4 operator*(const Matrix4x4& a, const Matrix4
     return result;
 }
 
-// Transform a point (w=1)
+
 __host__ __device__ inline float3 transform_point(const Matrix4x4& m, const float3& p) {
     float4 result = make_float4(
         m(0, 0) * p.x + m(0, 1) * p.y + m(0, 2) * p.z + m(0, 3),
@@ -155,7 +155,7 @@ __host__ __device__ inline float3 transform_point(const Matrix4x4& m, const floa
     return make_float3(result.x, result.y, result.z);
 }
 
-// Transform a vector (w=0)
+
 __host__ __device__ inline float3 transform_vector(const Matrix4x4& m, const float3& v) {
     return make_float3(
         m(0, 0) * v.x + m(0, 1) * v.y + m(0, 2) * v.z,
@@ -164,12 +164,12 @@ __host__ __device__ inline float3 transform_vector(const Matrix4x4& m, const flo
     );
 }
 
-// Transform a normal (requires inverse transpose of upper 3x3)
+
 __host__ __device__ inline float3 transform_normal(const Matrix4x4& m_inv_transpose, const float3& n) {
     return normalize(transform_vector(m_inv_transpose, n));
 }
 
-// Compute inverse of a 4x4 matrix
+
 __host__ inline Matrix4x4 inverse(const Matrix4x4& m) {
     Matrix4x4 inv;
     float det;
@@ -311,4 +311,4 @@ __host__ inline Matrix4x4 transpose(const Matrix4x4& m) {
     return result;
 }
 
-} // namespace wpt
+} 

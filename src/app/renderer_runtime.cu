@@ -10,7 +10,7 @@
 
 namespace wpt {
 
-// External wrapper function declarations from kernels.cu.
+
 void launch_generate_rays(
     PathStateView paths,
     const Camera& camera,
@@ -87,18 +87,18 @@ struct InteractiveRenderer::Impl {
         , total_samples(0)
         , exposure(0.06f)
         , max_depth(8) {
-        // Allocate path state.
+        
         path_state.resize(num_pixels);
         hit_info.resize(num_pixels);
 
-        // Allocate work queues.
+        
         work_queues.resize(num_pixels);
 
-        // Allocate framebuffer.
+        
         accumulation_buffer.resize(num_pixels);
         sample_count.resize(num_pixels);
 
-        // Allocate initial active path buffer.
+        
         initial_active.resize(num_pixels);
         init_sequence();
 
@@ -137,37 +137,37 @@ void InteractiveRenderer::render_frame(const Camera& camera, const Scene& scene)
     PathStateView paths = make_view(impl_->path_state);
     HitInfoView hits = make_view(impl_->hit_info);
 
-    // Generate primary rays.
+    
     launch_generate_rays(paths, camera, impl_->width, impl_->height, impl_->frame_number, 1, 0);
     CUDA_CHECK_LAST();
 
-    // Initialize active paths.
+    
     impl_->work_queues.reset();
 
     CUDA_CHECK(cudaMemcpy(impl_->work_queues.active_paths(), impl_->initial_active.data(),
                           impl_->num_pixels * sizeof(int), cudaMemcpyDeviceToDevice));
     impl_->work_queues.set_active_count(impl_->num_pixels);
 
-    // Path tracing loop.
+    
     int depth = 0;
     while (depth < impl_->max_depth) {
         unsigned int active_count = impl_->work_queues.get_active_count();
         if (active_count == 0) break;
         int active_count_i = static_cast<int>(active_count);
 
-        // Intersection.
+        
         launch_intersect(paths, hits, scene.bvh_nodes(), scene.triangles(),
                          impl_->work_queues.active_paths(), active_count_i);
         CUDA_CHECK_LAST();
 
-        // Shade misses.
+        
         launch_shade_miss(paths, hits, impl_->work_queues.active_paths(), active_count_i);
         CUDA_CHECK_LAST();
 
-        // Reset next queue.
+        
         CUDA_CHECK(cudaMemset(impl_->work_queues.next_count_ptr(), 0, sizeof(unsigned int)));
 
-        // Shade surfaces.
+        
         launch_shade_surface(paths, hits, scene.materials(),
                              impl_->work_queues.active_paths(),
                              impl_->work_queues.next_count_ptr(),
@@ -175,12 +175,12 @@ void InteractiveRenderer::render_frame(const Camera& camera, const Scene& scene)
                              active_count_i, impl_->max_depth);
         CUDA_CHECK_LAST();
 
-        // Swap queues.
+        
         impl_->work_queues.swap_queues();
         depth++;
     }
 
-    // Accumulate results.
+    
     launch_accumulate(paths, impl_->accumulation_buffer.data(), impl_->sample_count.data(),
                       impl_->width, impl_->height, impl_->num_pixels);
     CUDA_CHECK_LAST();
@@ -203,4 +203,4 @@ float& InteractiveRenderer::exposure() {
     return impl_->exposure;
 }
 
-} // namespace wpt
+} 
