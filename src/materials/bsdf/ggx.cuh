@@ -4,11 +4,11 @@
 
 namespace wpt {
 
-// =============================================================================
-// GGX/Trowbridge-Reitz Microfacet Distribution
-// =============================================================================
 
-// GGX distribution D(h)
+
+
+
+
 __host__ __device__ inline float ggx_d(float cos_theta_h, float alpha) {
     if (cos_theta_h <= 0.0f) return 0.0f;
 
@@ -20,7 +20,7 @@ __host__ __device__ inline float ggx_d(float cos_theta_h, float alpha) {
     return alpha2 / denom;
 }
 
-// GGX Smith geometry term G1
+
 __host__ __device__ inline float ggx_g1(float cos_theta, float alpha) {
     if (cos_theta <= 0.0f) return 0.0f;
 
@@ -31,22 +31,22 @@ __host__ __device__ inline float ggx_g1(float cos_theta, float alpha) {
     return 2.0f / (1.0f + sqrtf(1.0f + alpha2 * tan2));
 }
 
-// GGX Smith geometry term G(wo, wi) = G1(wo) * G1(wi)
+
 __host__ __device__ inline float ggx_g(float cos_theta_o, float cos_theta_i, float alpha) {
     return ggx_g1(cos_theta_o, alpha) * ggx_g1(cos_theta_i, alpha);
 }
 
-// GGX VNDF sampling (Heitz 2018) - returns microfacet normal in local space
+
 __host__ __device__ inline float3 ggx_sample_vndf(const float3& wo_local, float alpha, float u1, float u2) {
-    // Section 3.2: Transform view direction to hemisphere configuration
+    
     float3 Vh = normalize(make_float3(alpha * wo_local.x, alpha * wo_local.y, wo_local.z));
 
-    // Section 4.1: Orthonormal basis
+    
     float lensq = Vh.x * Vh.x + Vh.y * Vh.y;
     float3 T1 = lensq > 0.0f ? make_float3(-Vh.y, Vh.x, 0.0f) / sqrtf(lensq) : make_float3(1.0f, 0.0f, 0.0f);
     float3 T2 = cross(Vh, T1);
 
-    // Section 4.2: Parameterization of projected area
+    
     float r = sqrtf(u1);
     float phi = TWO_PI * u2;
     float t1 = r * cosf(phi);
@@ -54,14 +54,14 @@ __host__ __device__ inline float3 ggx_sample_vndf(const float3& wo_local, float 
     float s = 0.5f * (1.0f + Vh.z);
     t2 = (1.0f - s) * sqrtf(1.0f - t1 * t1) + s * t2;
 
-    // Section 4.3: Reprojection onto hemisphere
+    
     float3 Nh = t1 * T1 + t2 * T2 + sqrtf(fmaxf(0.0f, 1.0f - t1 * t1 - t2 * t2)) * Vh;
 
-    // Section 3.4: Transform back to ellipsoid configuration
+    
     return normalize(make_float3(alpha * Nh.x, alpha * Nh.y, fmaxf(0.0f, Nh.z)));
 }
 
-// PDF of VNDF sampling
+
 __host__ __device__ inline float ggx_vndf_pdf(const float3& wo_local, const float3& h_local, float alpha) {
     float cos_theta_o = wo_local.z;
     if (cos_theta_o <= 0.0f) return 0.0f;
@@ -72,19 +72,19 @@ __host__ __device__ inline float ggx_vndf_pdf(const float3& wo_local, const floa
     return D * G1 * fmaxf(0.0f, dot(wo_local, h_local)) / cos_theta_o;
 }
 
-// =============================================================================
-// GGX Conductor (Metal) BSDF
-// =============================================================================
+
+
+
 
 struct GGXConductorBSDF {
-    float3 eta;    // Real part of complex IOR
-    float3 k;      // Imaginary part (extinction coefficient)
-    float alpha;   // Roughness (alpha = roughness^2 is common)
+    float3 eta;    
+    float3 k;      
+    float alpha;   
 
     __host__ __device__ GGXConductorBSDF(const float3& F0, float roughness)
         : alpha(fmaxf(0.001f, roughness * roughness)) {
-        // Approximate conductor IOR from F0 (reflectance at normal incidence)
-        // This is a simplification - real metals need measured spectral data
+        
+        
         eta = F0;
         k = make_float3(1.0f);
     }
@@ -92,9 +92,9 @@ struct GGXConductorBSDF {
     __host__ __device__ GGXConductorBSDF(const float3& eta_in, const float3& k_in, float roughness)
         : eta(eta_in), k(k_in), alpha(fmaxf(0.001f, roughness * roughness)) {}
 
-    // Fresnel for conductors (Schlick approximation with F0 from eta, k)
+    
     __host__ __device__ float3 fresnel(float cos_theta) const {
-        // Use Schlick with the "color" as F0
+        
         return fresnel_schlick(cos_theta, eta);
     }
 
@@ -120,18 +120,18 @@ struct GGXConductorBSDF {
             return sample;
         }
 
-        // Sample microfacet normal using VNDF
+        
         float3 h = ggx_sample_vndf(wo_local, alpha, u1, u2);
 
-        // Reflect wo around h to get wi
+        
         sample.wi = reflect(-wo_local, h);
 
-        // Check that wi is in correct hemisphere
+        
         if (sample.wi.z <= 0.0f) {
             return sample;
         }
 
-        // Compute PDF
+        
         float vndf_pdf = ggx_vndf_pdf(wo_local, h, alpha);
         sample.pdf = vndf_pdf / (4.0f * dot(wo_local, h));
 
@@ -139,12 +139,12 @@ struct GGXConductorBSDF {
             return sample;
         }
 
-        // Evaluate BRDF
+        
         float D = ggx_d(h.z, alpha);
         float G = ggx_g(wo_local.z, sample.wi.z, alpha);
         float3 F = fresnel(dot(wo_local, h));
 
-        // f * cos(theta_i)
+        
         sample.f = F * D * G / (4.0f * wo_local.z) * sample.wi.z;
         sample.is_specular = (alpha < 0.01f);
         sample.is_transmission = false;
@@ -165,13 +165,13 @@ struct GGXConductorBSDF {
     }
 };
 
-// =============================================================================
-// GGX Dielectric (Glass) BSDF
-// =============================================================================
+
+
+
 
 struct GGXDielectricBSDF {
-    float eta;     // IOR ratio (outside / inside)
-    float alpha;   // Roughness
+    float eta;     
+    float alpha;   
 
     __host__ __device__ GGXDielectricBSDF(float ior, float roughness)
         : eta(ior), alpha(fmaxf(0.001f, roughness * roughness)) {}
@@ -183,24 +183,24 @@ struct GGXDielectricBSDF {
             return sample;
         }
 
-        // Determine if we're entering or exiting
+        
         bool entering = wo_local.z > 0.0f;
         float eta_ratio = entering ? (1.0f / eta) : eta;
         float3 n = entering ? make_float3(0.0f, 0.0f, 1.0f) : make_float3(0.0f, 0.0f, -1.0f);
 
-        // Sample microfacet normal
+        
         float3 wo_hemi = entering ? wo_local : -wo_local;
         float3 h = ggx_sample_vndf(wo_hemi, alpha, u1, u2);
         if (!entering) h = -h;
 
         float cos_theta_o = dot(wo_local, h);
 
-        // Fresnel
+        
         float F = fresnel_dielectric(fabsf(cos_theta_o), eta_ratio);
 
-        // Choose reflection or refraction
+        
         if (u3 < F) {
-            // Reflection
+            
             sample.wi = reflect(-wo_local, h);
             if ((entering && sample.wi.z <= 0.0f) || (!entering && sample.wi.z >= 0.0f)) {
                 return sample;
@@ -216,10 +216,10 @@ struct GGXDielectricBSDF {
             sample.is_specular = (alpha < 0.01f);
             sample.is_transmission = false;
         } else {
-            // Refraction
+            
             float3 refracted;
             if (!refract(wo_local, h, eta_ratio, refracted)) {
-                return sample;  // Total internal reflection should be handled by Fresnel
+                return sample;  
             }
             sample.wi = refracted;
 
@@ -240,7 +240,7 @@ struct GGXDielectricBSDF {
             float btdf = fabsf(cos_theta_o * cos_theta_i) * (1.0f - F) * D * G /
                         (fabsf(wo_local.z) * denom * denom);
 
-            // Account for solid angle compression
+            
             sample.f = make_float3(btdf * eta_ratio * eta_ratio);
             sample.is_specular = (alpha < 0.01f);
             sample.is_transmission = true;
@@ -251,9 +251,9 @@ struct GGXDielectricBSDF {
     }
 };
 
-// =============================================================================
-// Perfect Mirror (Delta BRDF)
-// =============================================================================
+
+
+
 
 struct MirrorBSDF {
     float3 reflectance;
@@ -268,8 +268,8 @@ struct MirrorBSDF {
         }
 
         sample.wi = make_float3(-wo_local.x, -wo_local.y, wo_local.z);
-        sample.pdf = 1.0f;  // Delta distribution
-        sample.f = reflectance;  // f / pdf = reflectance * delta / delta = reflectance
+        sample.pdf = 1.0f;  
+        sample.f = reflectance;  
         sample.is_specular = true;
         sample.is_transmission = false;
 
@@ -277,9 +277,9 @@ struct MirrorBSDF {
     }
 };
 
-// =============================================================================
-// Perfect Glass (Delta BTDF + BRDF)
-// =============================================================================
+
+
+
 
 struct PerfectGlassBSDF {
     float eta;
@@ -297,21 +297,21 @@ struct PerfectGlassBSDF {
         float F = fresnel_dielectric(cos_theta_i, entering ? eta : (1.0f / eta));
 
         if (u < F) {
-            // Reflection
+            
             sample.wi = make_float3(-wo_local.x, -wo_local.y, wo_local.z);
             sample.f = make_float3(1.0f);
             sample.is_transmission = false;
         } else {
-            // Refraction
+            
             float3 refracted;
             if (!refract(-wo_local, n, eta_ratio, refracted)) {
-                // Total internal reflection
+                
                 sample.wi = make_float3(-wo_local.x, -wo_local.y, wo_local.z);
                 sample.f = make_float3(1.0f);
                 sample.is_transmission = false;
             } else {
                 sample.wi = refracted;
-                sample.f = make_float3(eta_ratio * eta_ratio);  // Solid angle compression
+                sample.f = make_float3(eta_ratio * eta_ratio);  
                 sample.is_transmission = true;
             }
         }
@@ -323,4 +323,4 @@ struct PerfectGlassBSDF {
     }
 };
 
-} // namespace wpt
+} 

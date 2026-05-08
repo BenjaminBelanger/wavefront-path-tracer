@@ -4,12 +4,12 @@
 #include <cstdio>
 #include <iostream>
 
-// GLFW_INCLUDE_NONE prevents GLFW from including platform OpenGL headers.
+
 #define GLFW_INCLUDE_NONE
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-// Prevent cuda_gl_interop.h from including Windows GL/gl.h, which conflicts with GLAD symbols.
+
 #if defined(_WIN32)
 #ifndef __gl_h_
 #define __gl_h_
@@ -20,7 +20,7 @@
 #endif
 #include <cuda_gl_interop.h>
 
-// Missing from this project's minimal GLAD header.
+
 #ifndef GL_PIXEL_UNPACK_BUFFER
 #define GL_PIXEL_UNPACK_BUFFER 0x88EC
 #endif
@@ -40,7 +40,7 @@ namespace {
         }                                                                        \
     } while (0)
 
-} // namespace
+} 
 
 namespace wpt {
 
@@ -83,7 +83,7 @@ RenderWindow::RenderWindow(int width, int height, const char* title)
         return;
     }
 
-    glfwSwapInterval(0);  // Disable vsync for max performance.
+    glfwSwapInterval(0);  
 
     glfwSetWindowUserPointer(window_, this);
     glfwSetMouseButtonCallback(window_, mouse_button_callback);
@@ -93,7 +93,7 @@ RenderWindow::RenderWindow(int width, int height, const char* title)
 
     init_gl_resources();
 
-    // Initialize camera controller.
+    
     controller_.camera.look_at(
         ::make_float3(3.5f, 3.1f, -7.2f),
         ::make_float3(3.5f, 2.2f, 3.5f),
@@ -162,10 +162,10 @@ void RenderWindow::run(InteractiveRenderer& renderer, Scene& scene) {
             camera_changed_ = false;
         }
 
-        // Render a frame.
+        
         renderer.render_frame(controller_.camera, scene);
 
-        // Tonemap directly into the CUDA-mapped OpenGL PBO.
+        
         uchar4* mapped_buffer = nullptr;
         size_t mapped_size = 0;
         CUDA_RUNTIME_CHECK(cudaGraphicsMapResources(1, &cuda_pbo_resource_, 0));
@@ -344,4 +344,4 @@ void RenderWindow::key_callback(GLFWwindow* window, int key, int scancode, int a
     }
 }
 
-} // namespace wpt
+} 

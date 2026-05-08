@@ -5,11 +5,11 @@
 
 namespace wpt {
 
-// =============================================================================
-// LBVH Builder Kernels
-// =============================================================================
 
-// Compute Morton codes for all primitives
+
+
+
+
 __global__ void compute_morton_codes_kernel(
     const Triangle* __restrict__ primitives,
     uint32_t* __restrict__ morton_codes,
@@ -20,7 +20,7 @@ __global__ void compute_morton_codes_kernel(
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= count) return;
 
-    // Compute centroid and normalize to [0,1]^3
+    
     float3 centroid = primitives[idx].centroid();
     float3 extent = scene_bounds.extent();
     float3 offset = scene_bounds.min_bound;
@@ -34,7 +34,7 @@ __global__ void compute_morton_codes_kernel(
     indices[idx] = idx;
 }
 
-// Build internal nodes using parallel Karras algorithm
+
 __global__ void build_tree_kernel(
     const uint32_t* __restrict__ morton_codes,
     BVHNode* __restrict__ nodes,
@@ -43,11 +43,11 @@ __global__ void build_tree_kernel(
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= num_leaves - 1) return;
 
-    // Determine direction of the range
+    
     int d = (idx == 0 || (__clz(morton_codes[idx] ^ morton_codes[idx + 1]) >
                           __clz(morton_codes[idx] ^ morton_codes[idx - 1]))) ? 1 : -1;
 
-    // Compute upper bound for the length of the range
+    
     int delta_min = (idx == 0 && d == -1) ? -1 :
                     (idx == num_leaves - 1 && d == 1) ? -1 :
                     __clz(morton_codes[idx] ^ morton_codes[idx - d]);
@@ -59,7 +59,7 @@ __global__ void build_tree_kernel(
         l_max *= 2;
     }
 
-    // Find the other end using binary search
+    
     int l = 0;
     for (int t = l_max / 2; t >= 1; t /= 2) {
         if (idx + (l + t) * d >= 0 &&
@@ -71,7 +71,7 @@ __global__ void build_tree_kernel(
 
     int j = idx + l * d;
 
-    // Find the split position using binary search
+    
     int delta_node = __clz(morton_codes[idx] ^ morton_codes[j]);
     int s = 0;
     int t = l;
@@ -87,26 +87,26 @@ __global__ void build_tree_kernel(
 
     int split = idx + s * d + (d < 0 ? d : 0);
 
-    // Output child pointer
+    
     int left;
 
-    // Left child
+    
     int min_ij = (idx < j) ? idx : j;
     if (min_ij == split) {
-        left = num_leaves - 1 + split;  // Leaf
+        left = num_leaves - 1 + split;  
     } else {
-        left = split;  // Internal
+        left = split;  
     }
 
-    // Store in node
+    
     nodes[idx].left_or_first = left;
-    nodes[idx].prim_count = 0;  // Mark as internal
+    nodes[idx].prim_count = 0;  
 
-    // Right child follows the compact convention:
-    // Use a convention: right child = left_or_first + 1 for consecutive allocation
+    
+    
 }
 
-// Initialize leaf nodes
+
 __global__ void init_leaves_kernel(
     const Triangle* __restrict__ primitives,
     const int* __restrict__ sorted_indices,
@@ -125,11 +125,11 @@ __global__ void init_leaves_kernel(
 
     nodes[leaf_idx].bounds_min = bounds.min_bound;
     nodes[leaf_idx].bounds_max = bounds.max_bound;
-    nodes[leaf_idx].left_or_first = idx;  // Index into sorted primitives
-    nodes[leaf_idx].prim_count = 1;       // Single primitive per leaf
+    nodes[leaf_idx].left_or_first = idx;  
+    nodes[leaf_idx].prim_count = 1;       
 }
 
-// Compute bounding boxes bottom-up using atomic operations
+
 __global__ void compute_bounds_kernel(
     BVHNode* __restrict__ nodes,
     int* __restrict__ node_counters,
@@ -141,21 +141,21 @@ __global__ void compute_bounds_kernel(
 
     int leaf_idx = num_internal + idx;
 
-    // Walk up the tree
+    
     int current = leaf_idx;
     while (current > 0) {
-        // Find parent (this is a simplification - actual implementation needs parent pointers)
+        
         int parent = (current - 1) / 2;
 
-        // Atomic increment to ensure both children have been processed
+        
         int old_count = atomicAdd(&node_counters[parent], 1);
 
         if (old_count == 0) {
-            // First child to arrive, wait for sibling
+            
             return;
         }
 
-        // Second child - both children ready, compute bounds
+        
         int left = parent * 2 + 1;
         int right = parent * 2 + 2;
 
@@ -172,9 +172,9 @@ __global__ void compute_bounds_kernel(
     }
 }
 
-// =============================================================================
-// BVH Build Implementation (CPU fallback with simpler algorithm)
-// =============================================================================
+
+
+
 
 struct BVHBuildEntry {
     int node_idx;
@@ -187,16 +187,16 @@ void BVH::build(const Triangle* triangles, int count) {
 
     num_primitives_ = count;
 
-    // Compute scene bounds
+    
     world_bounds_ = AABB::empty();
     for (int i = 0; i < count; i++) {
         world_bounds_.expand(triangles[i].bounds());
     }
 
-    // Copy primitives to device
+    
     primitives_.upload(triangles, count);
 
-    // Create primitive indices and compute centroids/morton codes on CPU
+    
     std::vector<int> indices(count);
     std::vector<uint32_t> morton_codes(count);
     std::vector<float3> centroids(count);
@@ -216,26 +216,26 @@ void BVH::build(const Triangle* triangles, int count) {
         morton_codes[i] = morton_code_3d(normalized);
     }
 
-    // Sort by Morton code
+    
     std::vector<std::pair<uint32_t, int>> sorted(count);
     for (int i = 0; i < count; i++) {
         sorted[i] = {morton_codes[i], i};
     }
     std::sort(sorted.begin(), sorted.end());
 
-    // Reorder primitives
+    
     std::vector<Triangle> sorted_prims(count);
     for (int i = 0; i < count; i++) {
         sorted_prims[i] = triangles[sorted[i].second];
     }
     primitives_.upload(sorted_prims.data(), count);
 
-    // Build BVH using recursive SAH-based splitting
+    
     std::vector<BVHNode> nodes;
     nodes.reserve(2 * count);
 
     std::vector<BVHBuildEntry> stack;
-    nodes.push_back(BVHNode());  // Root node
+    nodes.push_back(BVHNode());  
     stack.push_back({0, 0, count});
 
     while (!stack.empty()) {
@@ -244,7 +244,7 @@ void BVH::build(const Triangle* triangles, int count) {
 
         BVHNode& node = nodes[entry.node_idx];
 
-        // Compute bounds for this node
+        
         AABB bounds = AABB::empty();
         for (int i = entry.start; i < entry.end; i++) {
             bounds.expand(sorted_prims[i].bounds());
@@ -253,14 +253,14 @@ void BVH::build(const Triangle* triangles, int count) {
 
         int prim_count = entry.end - entry.start;
 
-        // Make leaf if few primitives
+        
         if (prim_count <= 4) {
             node.left_or_first = entry.start;
             node.prim_count = prim_count;
             continue;
         }
 
-        // Find best split using SAH
+        
         int best_axis = bounds.largest_axis();
         int best_split = entry.start + prim_count / 2;
 
@@ -268,7 +268,7 @@ void BVH::build(const Triangle* triangles, int count) {
         float inv_parent_area = 1.0f / bounds.surface_area();
 
         for (int axis = 0; axis < 3; axis++) {
-            // Sort centroids along axis
+            
             std::vector<std::pair<float, int>> axis_sorted(prim_count);
             for (int i = 0; i < prim_count; i++) {
                 int idx = entry.start + i;
@@ -279,7 +279,7 @@ void BVH::build(const Triangle* triangles, int count) {
             }
             std::sort(axis_sorted.begin(), axis_sorted.end());
 
-            // Sweep to find best split
+            
             AABB left_bounds = AABB::empty();
             for (int i = 0; i < prim_count - 1; i++) {
                 left_bounds.expand(sorted_prims[axis_sorted[i].second].bounds());
@@ -300,14 +300,14 @@ void BVH::build(const Triangle* triangles, int count) {
             }
         }
 
-        // If no good split found, make leaf
+        
         if (best_cost >= prim_count) {
             node.left_or_first = entry.start;
             node.prim_count = prim_count;
             continue;
         }
 
-        // Sort primitives by best axis for partition
+        
         std::sort(sorted_prims.begin() + entry.start, sorted_prims.begin() + entry.end,
             [best_axis](const Triangle& a, const Triangle& b) {
                 float ca = (best_axis == 0) ? a.centroid().x :
@@ -317,8 +317,8 @@ void BVH::build(const Triangle* triangles, int count) {
                 return ca < cb;
             });
 
-        // Internal node: reserve two consecutive child slots so traversal
-        // rule right_child = left_child + 1 remains valid.
+        
+        
         int left_child = static_cast<int>(nodes.size());
         nodes.push_back(BVHNode());
         int right_child = static_cast<int>(nodes.size());
@@ -327,16 +327,16 @@ void BVH::build(const Triangle* triangles, int count) {
         node.left_or_first = left_child;
         node.prim_count = 0;
 
-        // Push right first so left subtree is processed next.
+        
         stack.push_back({right_child, best_split, entry.end});
         stack.push_back({left_child, entry.start, best_split});
     }
 
     num_nodes_ = static_cast<int>(nodes.size());
 
-    // Upload nodes and re-upload sorted primitives
+    
     nodes_.upload(nodes.data(), nodes.size());
     primitives_.upload(sorted_prims.data(), sorted_prims.size());
 }
 
-} // namespace wpt
+} 

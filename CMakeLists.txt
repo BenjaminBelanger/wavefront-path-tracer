@@ -1,37 +1,28 @@
 cmake_minimum_required(VERSION 3.24)
 
-# Enable CUDA language
 project(WavefrontPathTracer LANGUAGES CXX CUDA)
 
-# C++ and CUDA standards
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
-# CUDA architecture - target modern GPUs (Ampere and newer for best features)
-# Can be overridden with -DCMAKE_CUDA_ARCHITECTURES=XX
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     set(CMAKE_CUDA_ARCHITECTURES 75 86 89)
 endif()
 
-# Build type (single-config generators only)
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
-# Find CUDA Toolkit
 find_package(CUDAToolkit REQUIRED)
 
-# Find OpenGL
 find_package(OpenGL REQUIRED)
 
-# GLFW - try to find system installation, otherwise use FetchContent
 find_package(glfw3 3.3 QUIET)
 if(NOT glfw3_FOUND)
     include(FetchContent)
@@ -46,7 +37,6 @@ if(NOT glfw3_FOUND)
     FetchContent_MakeAvailable(glfw)
 endif()
 
-# GLM for CPU-side math (GLFW interop)
 find_package(glm QUIET)
 if(NOT glm_FOUND)
     include(FetchContent)
@@ -58,7 +48,6 @@ if(NOT glm_FOUND)
     FetchContent_MakeAvailable(glm)
 endif()
 
-# Source files
 set(CORE_SOURCES
     src/core/math/vector.cuh
     src/core/math/matrix.cuh
@@ -109,18 +98,15 @@ set(APP_SOURCES
     src/app/main.cu
 )
 
-# GLAD OpenGL loader
 set(GLAD_SOURCES
     external/glad/src/glad.c
 )
 
-# Header-only external libraries and GLAD
 set(EXTERNAL_INCLUDES
     ${CMAKE_SOURCE_DIR}/external
     ${CMAKE_SOURCE_DIR}/external/glad/include
 )
 
-# Create executable
 add_executable(wavefront-path-tracer
     ${CORE_SOURCES}
     ${GEOMETRY_SOURCES}
@@ -131,14 +117,12 @@ add_executable(wavefront-path-tracer
     ${GLAD_SOURCES}
 )
 
-# Include directories
 target_include_directories(wavefront-path-tracer PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${EXTERNAL_INCLUDES}
     ${CUDAToolkit_INCLUDE_DIRS}
 )
 
-# Link libraries
 target_link_libraries(wavefront-path-tracer PRIVATE
     CUDA::cudart
     CUDA::cuda_driver
@@ -147,7 +131,6 @@ target_link_libraries(wavefront-path-tracer PRIVATE
     glm::glm
 )
 
-# CUDA-specific compile options
 target_compile_options(wavefront-path-tracer PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:
         --use_fast_math
@@ -162,20 +145,17 @@ target_compile_definitions(wavefront-path-tracer PRIVATE
     $<$<CONFIG:Debug>:WAVEFRONT_PATH_TRACER_DEBUG>
 )
 
-# Enable separable compilation for device code
 set_target_properties(wavefront-path-tracer PROPERTIES
     CUDA_SEPARABLE_COMPILATION ON
     CUDA_RESOLVE_DEVICE_SYMBOLS ON
 )
 
-# Copy assets to build directory
 add_custom_command(TARGET wavefront-path-tracer POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${CMAKE_SOURCE_DIR}/assets
     $<TARGET_FILE_DIR:wavefront-path-tracer>/assets
 )
 
-# Print configuration summary
 message(STATUS "=== Wavefront Path Tracer Configuration ===")
 message(STATUS "CUDA Toolkit: ${CUDAToolkit_VERSION}")
 message(STATUS "CUDA Architectures: ${CMAKE_CUDA_ARCHITECTURES}")

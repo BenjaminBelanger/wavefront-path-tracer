@@ -6,4 +6,4 @@ namespace wpt {
 
 Scene create_demo_scene();
 
-} // namespace wpt
+} 

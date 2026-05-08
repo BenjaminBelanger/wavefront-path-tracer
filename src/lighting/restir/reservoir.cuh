@@ -7,19 +7,19 @@
 
 namespace wpt {
 
-// =============================================================================
-// Reservoir for ReSTIR (Spatiotemporal Reservoir Resampling)
-// Based on "Spatiotemporal reservoir resampling for real-time ray tracing
-// with dynamic direct lighting" (Bitterli et al., SIGGRAPH 2020)
-// =============================================================================
 
-// Light sample stored in reservoir
+
+
+
+
+
+
 struct LightSample {
-    int light_idx;          // Index of the light source
-    float3 point_on_light;  // Sampled point on the light
-    float3 light_normal;    // Normal at the sampled point
-    float3 emission;        // Emission at the sampled point
-    float pdf;              // PDF used to generate this sample
+    int light_idx;          
+    float3 point_on_light;  
+    float3 light_normal;    
+    float3 emission;        
+    float pdf;              
 
     __host__ __device__ LightSample()
         : light_idx(-1)
@@ -34,17 +34,17 @@ struct LightSample {
     }
 };
 
-// Reservoir data structure
+
 struct Reservoir {
-    LightSample y;          // Current selected sample
-    float w_sum;            // Sum of weights seen so far
-    int M;                  // Number of samples seen
-    float W;                // Contribution weight (for unbiased estimation)
+    LightSample y;          
+    float w_sum;            
+    int M;                  
+    float W;                
 
     __host__ __device__ Reservoir()
         : w_sum(0.0f), M(0), W(0.0f) {}
 
-    // Reset reservoir
+    
     __host__ __device__ void reset() {
         y = LightSample();
         w_sum = 0.0f;
@@ -52,8 +52,8 @@ struct Reservoir {
         W = 0.0f;
     }
 
-    // Update reservoir with a new sample
-    // Returns true if sample was accepted
+    
+    
     __device__ bool update(const LightSample& x, float w, PCG32& rng) {
         w_sum += w;
         M += 1;
@@ -65,7 +65,7 @@ struct Reservoir {
         return false;
     }
 
-    // Merge another reservoir into this one
+    
     __device__ void merge(const Reservoir& other, float p_hat, PCG32& rng) {
         if (other.M == 0) return;
 
@@ -73,7 +73,7 @@ struct Reservoir {
         update(other.y, w, rng);
     }
 
-    // Finalize reservoir: compute contribution weight W
+    
     __device__ void finalize(float p_hat) {
         if (p_hat > 0.0f && M > 0) {
             W = w_sum / (M * p_hat);
@@ -82,25 +82,25 @@ struct Reservoir {
         }
     }
 
-    // Check if reservoir has a valid sample
+    
     __host__ __device__ bool is_valid() const {
         return M > 0 && y.is_valid();
     }
 };
 
-// =============================================================================
-// Reservoir SoA for GPU-friendly storage
-// =============================================================================
+
+
+
 
 struct ReservoirSoA {
-    // Selected sample
+    
     DeviceBuffer<int> light_idx;
     DeviceBuffer<float> point_x, point_y, point_z;
     DeviceBuffer<float> normal_x, normal_y, normal_z;
     DeviceBuffer<float> emission_x, emission_y, emission_z;
     DeviceBuffer<float> pdf;
 
-    // Reservoir state
+    
     DeviceBuffer<float> w_sum;
     DeviceBuffer<int> M;
     DeviceBuffer<float> W;
@@ -123,7 +123,7 @@ struct ReservoirSoA {
     }
 
     void clear() {
-        cudaMemset(light_idx.data(), 0xFF, light_idx.size() * sizeof(int));  // -1
+        cudaMemset(light_idx.data(), 0xFF, light_idx.size() * sizeof(int));  
         cudaMemset(w_sum.data(), 0, w_sum.size() * sizeof(float));
         cudaMemset(M.data(), 0, M.size() * sizeof(int));
         cudaMemset(W.data(), 0, W.size() * sizeof(float));
@@ -205,11 +205,11 @@ inline ReservoirView make_view(ReservoirSoA& soa) {
     return v;
 }
 
-// =============================================================================
-// Target Function (p-hat) for ReSTIR
-// =============================================================================
 
-// Compute target PDF (unnormalized importance) for a light sample
+
+
+
+
 __device__ inline float compute_target_pdf(
     const LightSample& sample,
     const float3& shading_point,
@@ -218,13 +218,13 @@ __device__ inline float compute_target_pdf(
 ) {
     if (!sample.is_valid()) return 0.0f;
 
-    // Direction and distance to light
+    
     float3 to_light = sample.point_on_light - shading_point;
     float dist_sq = length_squared(to_light);
     float dist = sqrtf(dist_sq);
     float3 wi = to_light / dist;
 
-    // Geometric term
+    
     float cos_theta_i = dot(shading_normal, wi);
     float cos_theta_o = dot(sample.light_normal, -wi);
 
@@ -232,9 +232,9 @@ __device__ inline float compute_target_pdf(
         return 0.0f;
     }
 
-    // Contribution: L * BRDF * G
-    // For diffuse: BRDF = albedo / PI
-    // G = cos_theta_i * cos_theta_o / dist^2
+    
+    
+    
     float3 L = sample.emission;
     float3 brdf = albedo * INV_PI;
     float G = cos_theta_i * cos_theta_o / dist_sq;
@@ -243,14 +243,14 @@ __device__ inline float compute_target_pdf(
     return luminance(contrib);
 }
 
-// =============================================================================
-// Alias Table for O(1) Light Selection
-// =============================================================================
+
+
+
 
 struct AliasEntry {
-    float prob;         // Probability of selecting original item
-    int alias;          // Alias index if not selected
-    float pdf_original; // PDF of selecting this entry directly
+    float prob;         
+    int alias;          
+    float pdf_original; 
 };
 
 struct AliasTable {
@@ -265,7 +265,7 @@ struct AliasTableView {
     const AliasEntry* __restrict__ entries;
     int count;
 
-    // Sample from alias table in O(1)
+    
     __device__ int sample(float u1, float u2, float& pdf) const {
         int idx = min_int(int(u1 * count), count - 1);
         const AliasEntry& entry = entries[idx];
@@ -290,19 +290,19 @@ inline AliasTableView make_view(const AliasTable& table) {
     return AliasTableView{table.entries.data(), table.count};
 }
 
-// =============================================================================
-// Path Reservoir for ReSTIR GI
-// =============================================================================
+
+
+
 
 struct PathSample {
-    // Reconnection vertex (where paths can be reconnected)
+    
     float3 reconnection_pos;
     float3 reconnection_normal;
 
-    // Prefix path contribution (from camera to reconnection)
-    float3 Lo;              // Outgoing radiance at reconnection
+    
+    float3 Lo;              
 
-    // Path metadata
+    
     int path_length;
     bool is_valid;
 
@@ -351,4 +351,4 @@ struct PathReservoir {
     }
 };
 
-} // namespace wpt
+} 
