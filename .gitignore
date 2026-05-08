@@ -53,7 +53,6 @@ GPUProject/
 
 # Dependencies
 external/glfw/
-external/glad/
 
 # Assets (keep structure, ignore large files)
 assets/models/*.obj
