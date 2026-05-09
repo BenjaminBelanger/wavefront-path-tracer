@@ -2,8 +2,9 @@
 
 #include "scene.cuh"
 
-namespace wpt {
+namespace wpt
+{
 
-Scene create_demo_scene();
+    Scene create_demo_scene();
 
-} 
+}
