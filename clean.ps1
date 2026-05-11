@@ -8,10 +8,17 @@ param(
 
 Write-Host "Starting comment removal in: $RootPath" -ForegroundColor Cyan
 
-$files = Get-ChildItem -Path $RootPath -Recurse -File
+$excludeDirs = @("build", ".git", "external")
+$files = Get-ChildItem -Path $RootPath -Recurse -File | Where-Object {
+    $rel = $_.FullName.Substring($RootPath.Length).TrimStart('\', '/')
+    $skip = $false
+    foreach ($d in $excludeDirs) {
+        if ($rel -like "$d\*" -or $rel -like "$d/*") { $skip = $true; break }
+    }
+    -not $skip
+}
 
 foreach ($file in $files) {
-    # Skip the script itself
     if ($file.FullName -eq $MyInvocation.MyCommand.Path) { continue }
 
     try {

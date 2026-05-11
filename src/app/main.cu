@@ -5,6 +5,7 @@
 
 #include "demo_scene.cuh"
 #include "interactive_runtime.cuh"
+#include "../io/obj_loader.cuh"
 
 using namespace wpt;
 
@@ -41,6 +42,8 @@ int main(int argc, char **argv)
 
     int width = 1920;
     int height = 1080;
+    std::string scene_path;
+    float scene_scale = 1.0f;
 
     for (int i = 1; i < argc; i++)
     {
@@ -53,11 +56,21 @@ int main(int argc, char **argv)
         {
             height = std::stoi(argv[++i]);
         }
+        else if (arg == "--scene" && i + 1 < argc)
+        {
+            scene_path = argv[++i];
+        }
+        else if (arg == "--scale" && i + 1 < argc)
+        {
+            scene_scale = std::stof(argv[++i]);
+        }
         else if (arg == "--help")
         {
             std::cout << "Usage: wavefront-path-tracer [options]" << std::endl;
-            std::cout << "  --width <n>   Window width (default: 1920)" << std::endl;
-            std::cout << "  --height <n>  Window height (default: 1080)" << std::endl;
+            std::cout << "  --width <n>       Window width (default: 1920)" << std::endl;
+            std::cout << "  --height <n>      Window height (default: 1080)" << std::endl;
+            std::cout << "  --scene <path>    Load OBJ file" << std::endl;
+            std::cout << "  --scale <float>   Scale factor for OBJ (default: 1.0)" << std::endl;
             return 0;
         }
     }
@@ -65,7 +78,25 @@ int main(int argc, char **argv)
     std::cout << "\nResolution: " << width << "x" << height << std::endl;
 
     std::cout << "\nBuilding scene..." << std::endl;
-    Scene scene = create_demo_scene();
+    Scene scene;
+    if (!scene_path.empty())
+    {
+        ObjLoadOptions opts;
+        opts.scale = scene_scale;
+        if (!load_obj(scene, scene_path, opts))
+        {
+            std::cerr << "Failed to load scene, falling back to demo scene." << std::endl;
+            scene = create_demo_scene();
+        }
+        else
+        {
+            scene.build();
+        }
+    }
+    else
+    {
+        scene = create_demo_scene();
+    }
 
     RenderWindow window(width, height, "Wavefront Path Tracer");
 
