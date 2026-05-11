@@ -48,6 +48,14 @@ if(NOT glm_FOUND)
     FetchContent_MakeAvailable(glm)
 endif()
 
+include(FetchContent)
+FetchContent_Declare(
+    tinyobjloader
+    GIT_REPOSITORY https://github.com/tinyobjloader/tinyobjloader.git
+    GIT_TAG v2.0.0rc13
+)
+FetchContent_Populate(tinyobjloader)
+
 set(CORE_SOURCES
     src/core/math/vector.cuh
     src/core/math/matrix.cuh
@@ -85,6 +93,11 @@ set(INTEGRATOR_SOURCES
     src/integrators/wavefront/kernels.cu
 )
 
+set(IO_SOURCES
+    src/io/obj_loader.cuh
+    src/io/obj_loader.cu
+)
+
 set(APP_SOURCES
     src/app/camera.cuh
     src/app/scene.cuh
@@ -105,6 +118,7 @@ set(GLAD_SOURCES
 set(EXTERNAL_INCLUDES
     ${CMAKE_SOURCE_DIR}/external
     ${CMAKE_SOURCE_DIR}/external/glad/include
+    ${tinyobjloader_SOURCE_DIR}
 )
 
 add_executable(wavefront-path-tracer
@@ -113,6 +127,7 @@ add_executable(wavefront-path-tracer
     ${MATERIAL_SOURCES}
     ${LIGHTING_SOURCES}
     ${INTEGRATOR_SOURCES}
+    ${IO_SOURCES}
     ${APP_SOURCES}
     ${GLAD_SOURCES}
 )
