@@ -23,15 +23,18 @@ namespace wpt
         PathStateView paths,
         HitInfoView hits,
         const BVHNode *bvh_nodes,
+        const TrianglePrecomputed *precomputed,
         const Triangle *triangles,
         const int *active_paths,
-        int active_count);
+        const unsigned int *active_count_ptr,
+        int max_threads);
 
     void launch_shade_miss(
         PathStateView paths,
         const HitInfoView &hits,
         const int *active_paths,
-        int active_count);
+        const unsigned int *active_count_ptr,
+        int max_threads);
 
     void launch_shade_surface(
         PathStateView paths,
@@ -40,7 +43,8 @@ namespace wpt
         const int *active_paths,
         unsigned int *next_count,
         int *next_paths,
-        int active_count,
+        const unsigned int *active_count_ptr,
+        int max_threads,
         int max_depth);
 
     void launch_accumulate(
@@ -139,19 +143,15 @@ namespace wpt
                               impl_->num_pixels * sizeof(int), cudaMemcpyDeviceToDevice));
         impl_->work_queues.set_active_count(impl_->num_pixels);
 
-        int depth = 0;
-        while (depth < impl_->max_depth)
+        for (int depth = 0; depth < impl_->max_depth; depth++)
         {
-            unsigned int active_count = impl_->work_queues.get_active_count();
-            if (active_count == 0)
-                break;
-            int active_count_i = static_cast<int>(active_count);
-
-            launch_intersect(paths, hits, scene.bvh_nodes(), scene.triangles(),
-                             impl_->work_queues.active_paths(), active_count_i);
+            launch_intersect(paths, hits, scene.bvh_nodes(), scene.precomputed_triangles(),
+                             scene.triangles(), impl_->work_queues.active_paths(),
+                             impl_->work_queues.active_count_ptr(), impl_->num_pixels);
             CUDA_CHECK_LAST();
 
-            launch_shade_miss(paths, hits, impl_->work_queues.active_paths(), active_count_i);
+            launch_shade_miss(paths, hits, impl_->work_queues.active_paths(),
+                              impl_->work_queues.active_count_ptr(), impl_->num_pixels);
             CUDA_CHECK_LAST();
 
             CUDA_CHECK(cudaMemset(impl_->work_queues.next_count_ptr(), 0, sizeof(unsigned int)));
@@ -160,11 +160,11 @@ namespace wpt
                                  impl_->work_queues.active_paths(),
                                  impl_->work_queues.next_count_ptr(),
                                  impl_->work_queues.next_paths(),
-                                 active_count_i, impl_->max_depth);
+                                 impl_->work_queues.active_count_ptr(), impl_->num_pixels,
+                                 impl_->max_depth);
             CUDA_CHECK_LAST();
 
             impl_->work_queues.swap_queues();
-            depth++;
         }
 
         launch_accumulate(paths, impl_->accumulation_buffer.data(), impl_->sample_count.data(),

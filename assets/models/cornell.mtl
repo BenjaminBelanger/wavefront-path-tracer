@@ -1,0 +1,22 @@
+newmtl white
+Kd 0.73 0.73 0.73
+
+newmtl red
+Kd 0.65 0.05 0.05
+
+newmtl green
+Kd 0.12 0.45 0.15
+
+newmtl light
+Ke 1.0 1.0 1.0
+Kd 0.0 0.0 0.0
+
+newmtl mirror
+Ks 0.95 0.95 0.95
+Ns 500
+Kd 0.0 0.0 0.0
+
+newmtl glass
+Kd 1.0 1.0 1.0
+d 0.0
+Ni 1.5
