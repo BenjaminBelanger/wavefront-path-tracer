@@ -258,7 +258,7 @@ namespace wpt
         const float3 *__restrict__ normals,
         const float3 *__restrict__ albedos,
         const BVHNode *__restrict__ bvh_nodes,
-        const Triangle *__restrict__ triangles,
+        const TrianglePrecomputed *__restrict__ precomputed,
         int num_pixels)
     {
         int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -289,7 +289,7 @@ namespace wpt
         shadow_ray.t_min = RAY_EPSILON;
         shadow_ray.t_max = dist - RAY_EPSILON;
 
-        bool occluded = traverse_bvh_shadow(bvh_nodes, triangles, shadow_ray);
+        bool occluded = traverse_bvh_shadow(bvh_nodes, precomputed, shadow_ray);
 
         if (occluded)
         {
@@ -352,7 +352,7 @@ namespace wpt
             int num_lights,
             const AliasTable &light_alias,
             const BVHNode *bvh_nodes,
-            const Triangle *triangles,
+            const TrianglePrecomputed *precomputed,
             PCG32 *rngs)
         {
             int num_pixels = width_ * height_;
@@ -405,7 +405,7 @@ namespace wpt
                 output_.data(),
                 make_view(current_reservoirs_),
                 positions, normals, albedos,
-                bvh_nodes, triangles,
+                bvh_nodes, precomputed,
                 num_pixels);
 
             std::swap(current_reservoirs_, prev_reservoirs_);

@@ -62,6 +62,8 @@ namespace wpt
         Triangle *primitives_ptr() { return primitives_.data(); }
         int *primitive_indices_ptr() { return prim_indices_.data(); }
 
+        const TrianglePrecomputed *precomputed() const { return precomputed_.data(); }
+
         int num_nodes() const { return num_nodes_; }
         int num_primitives() const { return num_primitives_; }
 
@@ -70,6 +72,7 @@ namespace wpt
     private:
         DeviceBuffer<BVHNode> nodes_;
         DeviceBuffer<Triangle> primitives_;
+        DeviceBuffer<TrianglePrecomputed> precomputed_;
         DeviceBuffer<int> prim_indices_;
 
         int num_nodes_;
@@ -107,7 +110,7 @@ namespace wpt
 
     __device__ inline bool traverse_bvh(
         const BVHNode *__restrict__ nodes,
-        const Triangle *__restrict__ primitives,
+        const TrianglePrecomputed *__restrict__ primitives,
         const Ray &ray,
         float &t_hit,
         float &u_hit,
@@ -122,25 +125,17 @@ namespace wpt
         float closest_t = ray.t_max;
 
         float3 inv_dir = make_float3(1.0f / ray.direction.x, 1.0f / ray.direction.y, 1.0f / ray.direction.z);
-        int3 dir_is_neg = make_int3(ray.direction.x < 0, ray.direction.y < 0, ray.direction.z < 0);
 
         while (!state.empty())
         {
             int node_idx = state.pop();
             const BVHNode &node = nodes[node_idx];
 
-            AABB box = node.bounds();
-            if (!box.intersect_fast(ray.origin, inv_dir, ray.t_min, closest_t))
-            {
-                continue;
-            }
-
             if (node.is_leaf())
             {
-
                 for (uint32_t i = 0; i < node.prim_count; i++)
                 {
-                    const Triangle &tri = primitives[node.first_prim() + i];
+                    const TrianglePrecomputed &tri = primitives[node.first_prim() + i];
                     float t, u, v;
                     if (tri.intersect(ray, t, u, v) && t < closest_t)
                     {
@@ -156,25 +151,31 @@ namespace wpt
             }
             else
             {
-
-                int axis = box.largest_axis();
-                bool dir_neg = false;
-                if (axis == 0)
-                    dir_neg = dir_is_neg.x;
-                else if (axis == 1)
-                    dir_neg = dir_is_neg.y;
-                else
-                    dir_neg = dir_is_neg.z;
-
-                if (dir_neg)
+                const BVHNode &left_node = nodes[node.left_child()];
+                const BVHNode &right_node = nodes[node.right_child()];
+                float t_left, t_right;
+                bool hit_left = left_node.bounds().intersect_fast(ray.origin, inv_dir, ray.t_min, closest_t, t_left);
+                bool hit_right = right_node.bounds().intersect_fast(ray.origin, inv_dir, ray.t_min, closest_t, t_right);
+                if (hit_left && hit_right)
                 {
-                    state.push(node.left_child());
-                    state.push(node.right_child());
+                    if (t_left < t_right)
+                    {
+                        state.push(node.right_child());
+                        state.push(node.left_child());
+                    }
+                    else
+                    {
+                        state.push(node.left_child());
+                        state.push(node.right_child());
+                    }
                 }
-                else
+                else if (hit_left)
+                {
+                    state.push(node.left_child());
+                }
+                else if (hit_right)
                 {
                     state.push(node.right_child());
-                    state.push(node.left_child());
                 }
             }
         }
@@ -184,7 +185,7 @@ namespace wpt
 
     __device__ inline bool traverse_bvh_shadow(
         const BVHNode *__restrict__ nodes,
-        const Triangle *__restrict__ primitives,
+        const TrianglePrecomputed *__restrict__ primitives,
         const Ray &ray)
     {
         BVHTraversalState state;
@@ -197,17 +198,11 @@ namespace wpt
             int node_idx = state.pop();
             const BVHNode &node = nodes[node_idx];
 
-            AABB box = node.bounds();
-            if (!box.intersect_fast(ray.origin, inv_dir, ray.t_min, ray.t_max))
-            {
-                continue;
-            }
-
             if (node.is_leaf())
             {
                 for (uint32_t i = 0; i < node.prim_count; i++)
                 {
-                    const Triangle &tri = primitives[node.first_prim() + i];
+                    const TrianglePrecomputed &tri = primitives[node.first_prim() + i];
                     float t, u, v;
                     if (tri.intersect(ray, t, u, v))
                     {
@@ -217,8 +212,12 @@ namespace wpt
             }
             else
             {
-                state.push(node.left_child());
-                state.push(node.right_child());
+                const BVHNode &left_node = nodes[node.left_child()];
+                const BVHNode &right_node = nodes[node.right_child()];
+                if (left_node.bounds().intersect_fast(ray.origin, inv_dir, ray.t_min, ray.t_max))
+                    state.push(node.left_child());
+                if (right_node.bounds().intersect_fast(ray.origin, inv_dir, ray.t_min, ray.t_max))
+                    state.push(node.right_child());
             }
         }
 
