@@ -40,6 +40,7 @@ namespace wpt
         PathStateView paths,
         const HitInfoView &hits,
         const Material *materials,
+        const cudaTextureObject_t *textures,
         const int *active_paths,
         unsigned int *next_count,
         int *next_paths,
@@ -157,6 +158,7 @@ namespace wpt
             CUDA_CHECK(cudaMemset(impl_->work_queues.next_count_ptr(), 0, sizeof(unsigned int)));
 
             launch_shade_surface(paths, hits, scene.materials(),
+                                 scene.textures(),
                                  impl_->work_queues.active_paths(),
                                  impl_->work_queues.next_count_ptr(),
                                  impl_->work_queues.next_paths(),

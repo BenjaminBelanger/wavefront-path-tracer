@@ -116,6 +116,10 @@ namespace wpt
             hits.geom_normal_y[path_idx] = geom_normal.y;
             hits.geom_normal_z[path_idx] = geom_normal.z;
 
+            float2 tex_uv = tri.interpolate_uv(u_hit, v_hit);
+            hits.tex_u[path_idx] = tex_uv.x;
+            hits.tex_v[path_idx] = tex_uv.y;
+
             paths.material_id[path_idx] = mat_id;
         }
         else
@@ -168,6 +172,7 @@ namespace wpt
         PathStateView paths,
         const HitInfoView hits,
         const Material *__restrict__ materials,
+        const cudaTextureObject_t *__restrict__ textures,
         const int *__restrict__ active_paths,
         unsigned int *__restrict__ next_count,
         int *__restrict__ next_paths,
@@ -194,7 +199,14 @@ namespace wpt
         }
 
         int mat_id = hits.material_id[path_idx];
-        const Material &material = materials[mat_id];
+        Material material = materials[mat_id];
+
+        if (material.albedo_tex >= 0 && textures != nullptr)
+        {
+            float2 uv = hits.get_tex_uv(path_idx);
+            float4 tex_color = tex2D<float4>(textures[material.albedo_tex], uv.x, uv.y);
+            material.albedo = make_float3(tex_color.x, tex_color.y, tex_color.z);
+        }
 
         float3 hit_pos = hits.get_position(path_idx);
         float3 normal = hits.get_normal(path_idx);
@@ -483,6 +495,7 @@ namespace wpt
         PathStateView paths,
         const HitInfoView &hits,
         const Material *materials,
+        const cudaTextureObject_t *textures,
         const int *active_paths,
         unsigned int *next_count,
         int *next_paths,
@@ -492,7 +505,7 @@ namespace wpt
     {
         int block = 256;
         int grid = (max_threads + block - 1) / block;
-        shade_surface_kernel<<<grid, block>>>(paths, hits, materials, active_paths,
+        shade_surface_kernel<<<grid, block>>>(paths, hits, materials, textures, active_paths,
                                               next_count, next_paths, active_count_ptr, max_depth);
     }
 
