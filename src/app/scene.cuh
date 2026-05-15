@@ -6,6 +6,7 @@
 #include "../geometry/primitives/triangle.cuh"
 #include "../geometry/primitives/sphere.cuh"
 #include "../materials/bsdf/bsdf.cuh"
+#include "../core/texture/texture_manager.cuh"
 #include <vector>
 
 namespace wpt
@@ -70,6 +71,10 @@ namespace wpt
     {
     public:
         Scene() = default;
+        Scene(Scene &&) = default;
+        Scene &operator=(Scene &&) = default;
+        Scene(const Scene &) = delete;
+        Scene &operator=(const Scene &) = delete;
 
         void add_triangle(const Triangle &tri)
         {
@@ -122,6 +127,9 @@ namespace wpt
             lights_.push_back(light);
         }
 
+        TextureManager &texture_manager() { return texture_manager_; }
+        const cudaTextureObject_t *textures() const { return texture_manager_.device_textures(); }
+
         void build()
         {
             if (!triangles_.empty())
@@ -141,6 +149,8 @@ namespace wpt
             {
                 spheres_gpu_.upload(spheres_.data(), spheres_.size());
             }
+
+            texture_manager_.upload();
         }
 
         const BVHNode *bvh_nodes() const { return bvh_.nodes(); }
@@ -298,6 +308,7 @@ namespace wpt
         DeviceBuffer<Material> materials_gpu_;
         DeviceBuffer<Light> lights_gpu_;
         DeviceBuffer<Sphere> spheres_gpu_;
+        TextureManager texture_manager_;
     };
 
 }

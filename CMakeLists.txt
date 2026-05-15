@@ -87,6 +87,11 @@ set(LIGHTING_SOURCES
     src/lighting/restir/restir_di.cu
 )
 
+set(TEXTURE_SOURCES
+    src/core/texture/texture_manager.cuh
+    src/core/texture/texture_manager.cu
+)
+
 set(INTEGRATOR_SOURCES
     src/integrators/wavefront/path_state.cuh
     src/integrators/wavefront/ray_queue.cuh
@@ -123,6 +128,7 @@ set(EXTERNAL_INCLUDES
 
 add_executable(wavefront-path-tracer
     ${CORE_SOURCES}
+    ${TEXTURE_SOURCES}
     ${GEOMETRY_SOURCES}
     ${MATERIAL_SOURCES}
     ${LIGHTING_SOURCES}
