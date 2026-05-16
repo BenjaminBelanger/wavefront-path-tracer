@@ -191,6 +191,20 @@ namespace wpt
         }
     }
 
+    void RenderWindow::frame_scene(float3 center, float radius)
+    {
+        float distance = radius / tanf(controller_.camera.fov * 0.5f) * 1.5f;
+
+        float3 cam_pos = center - ::make_float3(0.0f, 0.0f, distance);
+
+        controller_.camera.look_at(
+            cam_pos,
+            center,
+            ::make_float3(0.0f, 1.0f, 0.0f));
+        controller_.camera.update();
+        camera_changed_ = true;
+    }
+
     CameraController &RenderWindow::camera_controller() { return controller_; }
 
     void RenderWindow::set_camera_changed() { camera_changed_ = true; }

@@ -42,6 +42,7 @@ namespace wpt
         bool should_close() const;
 
         void run(InteractiveRenderer &renderer, Scene &scene);
+        void frame_scene(float3 center, float radius);
 
         CameraController &camera_controller();
         void set_camera_changed();
