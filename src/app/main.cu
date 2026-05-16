@@ -106,6 +106,17 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    if (!scene_path.empty())
+    {
+        AABB bounds = scene.world_bounds();
+        if (bounds.is_valid())
+        {
+            float3 center = bounds.center();
+            float radius = length(bounds.extent()) * 0.5f;
+            window.frame_scene(center, radius);
+        }
+    }
+
     std::cout << "Initializing renderer..." << std::endl;
     InteractiveRenderer renderer(width, height);
 
