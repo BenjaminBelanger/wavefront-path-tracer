@@ -270,6 +270,7 @@ namespace wpt
         }
 
         float3 bsdf_weight = sample.f / sample.pdf;
+        bsdf_weight = clamp(bsdf_weight, 0.0f, 100.0f);
         paths.multiply_throughput(path_idx, bsdf_weight);
 
         Ray new_ray;
