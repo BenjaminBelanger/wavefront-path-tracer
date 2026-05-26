@@ -217,6 +217,13 @@ namespace wpt
             material.albedo = make_float3(tex_color.x, tex_color.y, tex_color.z);
         }
 
+        if (material.roughness_tex >= 0 && textures != nullptr)
+        {
+            float2 uv = hits.get_tex_uv(path_idx);
+            float4 tex_rough = tex2D<float4>(textures[material.roughness_tex], uv.x, uv.y);
+            material.roughness = tex_rough.x;
+        }
+
         float3 hit_pos = hits.get_position(path_idx);
         float3 normal = hits.get_normal(path_idx);
         float3 geom_normal = hits.get_geom_normal(path_idx);
