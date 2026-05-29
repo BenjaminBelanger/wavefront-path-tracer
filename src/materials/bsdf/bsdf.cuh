@@ -49,6 +49,7 @@ namespace wpt
         Dielectric,
         Plastic,
         Emission,
+        OrenNayar,
         COUNT
     };
 
@@ -128,6 +129,15 @@ namespace wpt
             m.albedo = color;
             m.roughness = rough;
             m.ior = ior_val;
+            return m;
+        }
+
+        __host__ static Material oren_nayar(const float3 &color, float sigma)
+        {
+            Material m;
+            m.type = MaterialType::OrenNayar;
+            m.albedo = color;
+            m.roughness = sigma;
             return m;
         }
 
