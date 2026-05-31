@@ -2,6 +2,7 @@
 
 #include "bsdf.cuh"
 #include "ggx.cuh"
+#include "dielectric.cuh"
 
 namespace wpt
 {
@@ -280,6 +281,41 @@ namespace wpt
             }
             return sample;
         }
+        case MaterialType::ThinFilm:
+        {
+            BSDFSample sample;
+            if (wo_local.z <= 0.0f)
+                return sample;
+
+            float cos_theta = wo_local.z;
+            float3 R = thin_film_reflectance_rgb(cos_theta, material.film_ior,
+                                                  material.film_thickness, material.ior);
+            float avg_R = (R.x + R.y + R.z) / 3.0f;
+
+            if (u1 < avg_R)
+            {
+                sample.wi = make_float3(-wo_local.x, -wo_local.y, wo_local.z);
+                sample.f = R * fabsf(sample.wi.z);
+                sample.pdf = avg_R;
+                sample.is_specular = true;
+            }
+            else
+            {
+                float remapped_u1 = (u1 - avg_R) / (1.0f - avg_R);
+                sample.wi = sample_hemisphere_cosine(remapped_u1, u2);
+                float diff_pdf = pdf_hemisphere_cosine(sample.wi.z);
+                float3 transmission = make_float3(1.0f - R.x, 1.0f - R.y, 1.0f - R.z);
+                sample.f = material.albedo * transmission * sample.wi.z;
+                sample.pdf = (1.0f - avg_R) * diff_pdf;
+                sample.is_specular = false;
+            }
+            sample.is_transmission = false;
+            if (sample.is_valid())
+            {
+                sample.wi = ctx.to_world(sample.wi);
+            }
+            return sample;
+        }
         case MaterialType::Dielectric:
         {
             if (material.roughness >= 0.01f)
@@ -393,6 +429,15 @@ namespace wpt
             float3 diff = material.albedo * INV_PI * (1.0f - F);
             return spec + diff;
         }
+        case MaterialType::ThinFilm:
+        {
+            if (wo_local.z <= 0.0f || wi_local.z <= 0.0f)
+                return make_float3(0.0f);
+            float3 R = thin_film_reflectance_rgb(wo_local.z, material.film_ior,
+                                                  material.film_thickness, material.ior);
+            float3 transmission = make_float3(1.0f - R.x, 1.0f - R.y, 1.0f - R.z);
+            return material.albedo * transmission * INV_PI;
+        }
         default:
         {
             LambertBSDF bsdf(material.albedo);
@@ -433,6 +478,15 @@ namespace wpt
             float spec_pdf = ggx_vndf_pdf(wo_local, h, alpha) / (4.0f * dot(wo_local, h));
             float diff_pdf = pdf_hemisphere_cosine(wi_local.z);
             return F * spec_pdf + (1.0f - F) * diff_pdf;
+        }
+        case MaterialType::ThinFilm:
+        {
+            if (wo_local.z <= 0.0f || wi_local.z <= 0.0f)
+                return 0.0f;
+            float3 R = thin_film_reflectance_rgb(wo_local.z, material.film_ior,
+                                                  material.film_thickness, material.ior);
+            float avg_R = (R.x + R.y + R.z) / 3.0f;
+            return (1.0f - avg_R) * pdf_hemisphere_cosine(wi_local.z);
         }
         default:
         {

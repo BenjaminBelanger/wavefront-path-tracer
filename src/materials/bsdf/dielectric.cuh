@@ -141,14 +141,13 @@ namespace wpt
         }
     };
 
-    __host__ __device__ inline float3 thin_film_fresnel(
+    __host__ __device__ inline float thin_film_reflectance(
         float cos_theta,
         float film_ior,
         float film_thickness_nm,
         float substrate_ior,
         float wavelength_nm)
     {
-
         float sin_theta = sqrtf(fmaxf(0.0f, 1.0f - cos_theta * cos_theta));
         float sin_theta_film = sin_theta / film_ior;
         float cos_theta_film = sqrtf(fmaxf(0.0f, 1.0f - sin_theta_film * sin_theta_film));
@@ -166,22 +165,23 @@ namespace wpt
         float R = (r01_sq + r12_sq + 2.0f * r01 * r12 * cos_phase) /
                   (1.0f + r01_sq * r12_sq + 2.0f * r01 * r12 * cos_phase);
 
-        float hue = fmodf(wavelength_nm - 380.0f, 400.0f) / 400.0f;
-        float3 color;
-        if (hue < 0.33f)
-        {
-            color = make_float3(1.0f - hue * 3.0f, hue * 3.0f, 0.0f);
-        }
-        else if (hue < 0.67f)
-        {
-            color = make_float3(0.0f, 1.0f - (hue - 0.33f) * 3.0f, (hue - 0.33f) * 3.0f);
-        }
-        else
-        {
-            color = make_float3((hue - 0.67f) * 3.0f, 0.0f, 1.0f - (hue - 0.67f) * 3.0f);
-        }
+        return fminf(fmaxf(R, 0.0f), 1.0f);
+    }
 
-        return color * R;
+    __host__ __device__ inline float3 thin_film_reflectance_rgb(
+        float cos_theta,
+        float film_ior,
+        float film_thickness_nm,
+        float substrate_ior)
+    {
+        constexpr float LAMBDA_R = 630.0f;
+        constexpr float LAMBDA_G = 532.0f;
+        constexpr float LAMBDA_B = 467.0f;
+
+        return make_float3(
+            thin_film_reflectance(cos_theta, film_ior, film_thickness_nm, substrate_ior, LAMBDA_R),
+            thin_film_reflectance(cos_theta, film_ior, film_thickness_nm, substrate_ior, LAMBDA_G),
+            thin_film_reflectance(cos_theta, film_ior, film_thickness_nm, substrate_ior, LAMBDA_B));
     }
 
 }
