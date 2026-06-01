@@ -259,6 +259,88 @@ namespace wpt
             t = f * dot(edge2, q);
             return t >= ray.t_min && t <= ray.t_max;
         }
+
+        __host__ __device__ bool intersect_watertight(const Ray &ray, float &t, float &u, float &v) const
+        {
+            float3 lv1 = v0 + edge1;
+            float3 lv2 = v0 + edge2;
+
+            int kz = max_dimension(abs(ray.direction));
+            int kx = kz + 1;
+            if (kx == 3)
+                kx = 0;
+            int ky = kx + 1;
+            if (ky == 3)
+                ky = 0;
+
+            if ((&ray.direction.x)[kz] < 0.0f)
+            {
+                int temp = kx;
+                kx = ky;
+                ky = temp;
+            }
+
+            float Sx = (&ray.direction.x)[kx] / (&ray.direction.x)[kz];
+            float Sy = (&ray.direction.x)[ky] / (&ray.direction.x)[kz];
+            float Sz = 1.0f / (&ray.direction.x)[kz];
+
+            float3 A = v0 - ray.origin;
+            float3 B = lv1 - ray.origin;
+            float3 C = lv2 - ray.origin;
+
+            float Ax = (&A.x)[kx] - Sx * (&A.x)[kz];
+            float Ay = (&A.x)[ky] - Sy * (&A.x)[kz];
+            float Bx = (&B.x)[kx] - Sx * (&B.x)[kz];
+            float By = (&B.x)[ky] - Sy * (&B.x)[kz];
+            float Cx = (&C.x)[kx] - Sx * (&C.x)[kz];
+            float Cy = (&C.x)[ky] - Sy * (&C.x)[kz];
+
+            float U = Cx * By - Cy * Bx;
+            float V = Ax * Cy - Ay * Cx;
+            float W = Bx * Ay - By * Ax;
+
+            if (U == 0.0f || V == 0.0f || W == 0.0f)
+            {
+                double CxBy = static_cast<double>(Cx) * static_cast<double>(By);
+                double CyBx = static_cast<double>(Cy) * static_cast<double>(Bx);
+                U = static_cast<float>(CxBy - CyBx);
+                double AxCy = static_cast<double>(Ax) * static_cast<double>(Cy);
+                double AyCx = static_cast<double>(Ay) * static_cast<double>(Cx);
+                V = static_cast<float>(AxCy - AyCx);
+                double BxAy = static_cast<double>(Bx) * static_cast<double>(Ay);
+                double ByAx = static_cast<double>(By) * static_cast<double>(Ax);
+                W = static_cast<float>(BxAy - ByAx);
+            }
+
+            if ((U < 0.0f || V < 0.0f || W < 0.0f) && (U > 0.0f || V > 0.0f || W > 0.0f))
+                return false;
+
+            float det = U + V + W;
+            if (det == 0.0f)
+                return false;
+
+            float Az = Sz * (&A.x)[kz];
+            float Bz = Sz * (&B.x)[kz];
+            float Cz = Sz * (&C.x)[kz];
+            float T = U * Az + V * Bz + W * Cz;
+
+            if (det > 0.0f)
+            {
+                if (T < ray.t_min * det || T > ray.t_max * det)
+                    return false;
+            }
+            else
+            {
+                if (T > ray.t_min * det || T < ray.t_max * det)
+                    return false;
+            }
+
+            float inv_det = 1.0f / det;
+            u = V * inv_det;
+            v = W * inv_det;
+            t = T * inv_det;
+            return true;
+        }
     };
 
 }
