@@ -120,6 +120,26 @@ namespace wpt
             hits.tex_u[path_idx] = tex_uv.x;
             hits.tex_v[path_idx] = tex_uv.y;
 
+            float3 edge1 = tri.v1 - tri.v0;
+            float3 edge2 = tri.v2 - tri.v0;
+            float2 duv1 = tri.uv1 - tri.uv0;
+            float2 duv2 = tri.uv2 - tri.uv0;
+            float det = duv1.x * duv2.y - duv2.x * duv1.y;
+            float3 tangent;
+            if (fabsf(det) > 1e-8f)
+            {
+                float inv_det = 1.0f / det;
+                tangent = normalize((edge1 * duv2.y - edge2 * duv1.y) * inv_det);
+            }
+            else
+            {
+                Frame fallback(normal);
+                tangent = fallback.tangent;
+            }
+            hits.tangent_x[path_idx] = tangent.x;
+            hits.tangent_y[path_idx] = tangent.y;
+            hits.tangent_z[path_idx] = tangent.z;
+
             paths.material_id[path_idx] = mat_id;
         }
         else
@@ -217,9 +237,30 @@ namespace wpt
             material.albedo = make_float3(tex_color.x, tex_color.y, tex_color.z);
         }
 
+        if (material.roughness_tex >= 0 && textures != nullptr)
+        {
+            float2 uv = hits.get_tex_uv(path_idx);
+            float4 tex_rough = tex2D<float4>(textures[material.roughness_tex], uv.x, uv.y);
+            material.roughness = tex_rough.x;
+        }
+
         float3 hit_pos = hits.get_position(path_idx);
         float3 normal = hits.get_normal(path_idx);
         float3 geom_normal = hits.get_geom_normal(path_idx);
+
+        if (material.normal_tex >= 0 && textures != nullptr)
+        {
+            float2 uv = hits.get_tex_uv(path_idx);
+            float4 tex_n = tex2D<float4>(textures[material.normal_tex], uv.x, uv.y);
+            float3 ts_normal = make_float3(tex_n.x * 2.0f - 1.0f, tex_n.y * 2.0f - 1.0f, tex_n.z * 2.0f - 1.0f);
+
+            float3 T = normalize(hits.get_tangent(path_idx));
+            float3 N = normal;
+            T = normalize(T - N * dot(T, N));
+            float3 B = cross(N, T);
+
+            normal = normalize(T * ts_normal.x + B * ts_normal.y + N * ts_normal.z);
+        }
 
         float3 ray_dir = make_float3(
             paths.ray_dir_x[path_idx],
@@ -261,7 +302,7 @@ namespace wpt
             paths.set_throughput(path_idx, throughput);
         }
 
-        BSDFSample sample = sample_bsdf(material, ctx, rng.next_float(), rng.next_float());
+        BSDFSample sample = sample_bsdf(material, ctx, rng.next_float(), rng.next_float(), rng.next_float());
 
         if (!sample.is_valid())
         {
