@@ -264,6 +264,7 @@ namespace wpt
         DeviceBuffer<float> pos_x, pos_y, pos_z;
         DeviceBuffer<float> normal_x, normal_y, normal_z;
         DeviceBuffer<float> geom_normal_x, geom_normal_y, geom_normal_z;
+        DeviceBuffer<float> tangent_x, tangent_y, tangent_z;
         DeviceBuffer<float> tex_u, tex_v;
 
         void resize(size_t count)
@@ -282,6 +283,9 @@ namespace wpt
             geom_normal_x.resize(count);
             geom_normal_y.resize(count);
             geom_normal_z.resize(count);
+            tangent_x.resize(count);
+            tangent_y.resize(count);
+            tangent_z.resize(count);
             tex_u.resize(count);
             tex_v.resize(count);
         }
@@ -305,6 +309,9 @@ namespace wpt
         float *__restrict__ geom_normal_x;
         float *__restrict__ geom_normal_y;
         float *__restrict__ geom_normal_z;
+        float *__restrict__ tangent_x;
+        float *__restrict__ tangent_y;
+        float *__restrict__ tangent_z;
         float *__restrict__ tex_u;
         float *__restrict__ tex_v;
 
@@ -326,6 +333,11 @@ namespace wpt
         __device__ float3 get_geom_normal(int idx) const
         {
             return make_float3(geom_normal_x[idx], geom_normal_y[idx], geom_normal_z[idx]);
+        }
+
+        __device__ float3 get_tangent(int idx) const
+        {
+            return make_float3(tangent_x[idx], tangent_y[idx], tangent_z[idx]);
         }
 
         __device__ float2 get_tex_uv(int idx) const
@@ -351,6 +363,9 @@ namespace wpt
         view.geom_normal_x = hits.geom_normal_x.data();
         view.geom_normal_y = hits.geom_normal_y.data();
         view.geom_normal_z = hits.geom_normal_z.data();
+        view.tangent_x = hits.tangent_x.data();
+        view.tangent_y = hits.tangent_y.data();
+        view.tangent_z = hits.tangent_z.data();
         view.tex_u = hits.tex_u.data();
         view.tex_v = hits.tex_v.data();
         return view;

@@ -23,6 +23,7 @@ namespace wpt
         int mango_diffuse = scene.add_material(Material::diffuse(::make_float3(0.94f, 0.62f, 0.2f)));
         int rose_gold_metal = scene.add_material(Material::metal(::make_float3(0.96f, 0.67f, 0.56f), 0.16f));
         int pearl_metal = scene.add_material(Material::metal(::make_float3(0.92f, 0.9f, 0.98f), 0.12f));
+        int thin_film_mat = scene.add_material(Material::thin_film(::make_float3(0.9f, 0.9f, 0.92f), 500.0f, 1.4f, 1.5f));
         int neon_pink_light = scene.add_material(Material::emissive(::make_float3(1.0f, 0.2f, 0.7f), 3.5f));
         int electric_blue_light = scene.add_material(Material::emissive(::make_float3(0.2f, 0.75f, 1.0f), 3.0f));
 
@@ -122,6 +123,8 @@ namespace wpt
         scene_shapes::add_uv_sphere(scene, ::make_float3(3.45f, 0.9f, 2.35f), 0.9f, chrome_mat, 24);
         scene_shapes::add_uv_sphere(scene, ::make_float3(5.35f, 0.75f, 4.65f), 0.75f, gold_mat, 24);
         scene_shapes::add_uv_sphere(scene, ::make_float3(1.9f, 0.42f, 1.65f), 0.42f, velvet_violet, 16);
+
+        scene_shapes::add_uv_sphere(scene, ::make_float3(3.7f, 0.65f, 5.2f), 0.65f, thin_film_mat, 24);
 
         scene_shapes::add_pyramid(scene, ::make_float3(5.45f, 0.0f, 1.95f), 1.0f, 1.35f, 0.42f, coral_diffuse);
         scene_shapes::add_octahedron(scene, ::make_float3(2.55f, 1.1f, 3.25f), 0.62f, 0.5f, mango_diffuse);

@@ -38,25 +38,41 @@ namespace wpt
         return std::clamp(1.0f - sqrtf(shininess / 1000.0f), 0.02f, 1.0f);
     }
 
-    static void load_albedo_texture(Material &m, Scene &scene, const tinyobj::material_t &mat, const std::string &mtl_basedir)
+    static int load_material_texture(
+        Scene &scene,
+        const std::string &texname_in,
+        const std::string &mtl_basedir,
+        bool srgb)
     {
-        if (mat.diffuse_texname.empty())
-            return;
+        if (texname_in.empty())
+            return -1;
 
-        std::string texname = mat.diffuse_texname;
+        std::string texname = texname_in;
         std::replace(texname.begin(), texname.end(), '\\', '/');
-        bool is_absolute = (texname.size() >= 2 && texname[1] == ':') || texname[0] == '/';
+
+        bool is_absolute = (texname.size() >= 2 && texname[1] == ':') || (!texname.empty() && texname[0] == '/');
         std::string tex_path = is_absolute ? texname : mtl_basedir + texname;
-        m.albedo_tex = scene.texture_manager().load_texture(tex_path);
-        if (m.albedo_tex < 0 && is_absolute)
-        {
-            size_t slash = texname.find_last_of('/');
-            if (slash != std::string::npos)
-            {
-                std::string fallback = mtl_basedir + texname.substr(slash + 1);
-                m.albedo_tex = scene.texture_manager().load_texture(fallback);
-            }
-        }
+        int tex_idx = scene.texture_manager().load_texture(tex_path, srgb);
+        if (tex_idx >= 0 || !is_absolute)
+            return tex_idx;
+
+        size_t slash = texname.find_last_of('/');
+        if (slash == std::string::npos)
+            return tex_idx;
+
+        std::string fallback = mtl_basedir + texname.substr(slash + 1);
+        return scene.texture_manager().load_texture(fallback, srgb);
+    }
+
+    static void load_surface_textures(Material &m, Scene &scene, const tinyobj::material_t &mat, const std::string &mtl_basedir)
+    {
+        m.albedo_tex = load_material_texture(scene, mat.diffuse_texname, mtl_basedir, true);
+
+        if (!mat.roughness_texname.empty())
+            m.roughness_tex = load_material_texture(scene, mat.roughness_texname, mtl_basedir, false);
+
+        if (!mat.normal_texname.empty())
+            m.normal_tex = load_material_texture(scene, mat.normal_texname, mtl_basedir, false);
     }
 
     static int map_material(Scene &scene, const tinyobj::material_t &mat, const std::string &mtl_basedir)
@@ -133,7 +149,7 @@ namespace wpt
             m = Material::diffuse(color);
         }
 
-        load_albedo_texture(m, scene, mat, mtl_basedir);
+        load_surface_textures(m, scene, mat, mtl_basedir);
 
         return scene.add_material(m);
     }
