@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <unordered_map>
 #include <cmath>
+#include <string>
+#include <vector>
 
 namespace wpt
 {

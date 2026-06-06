@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "reservoir.cuh"
 #include "../../core/memory/device_buffer.cuh"
 #include "../../geometry/bvh/bvh.cuh"
