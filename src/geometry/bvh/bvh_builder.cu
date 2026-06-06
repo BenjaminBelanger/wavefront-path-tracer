@@ -145,6 +145,8 @@ namespace wpt
             precomputed[i].from_triangle(sorted_prims[i]);
         }
         precomputed_.upload(precomputed.data(), precomputed.size());
+
+        primitives_host_ = std::move(sorted_prims);
     }
 
 }
