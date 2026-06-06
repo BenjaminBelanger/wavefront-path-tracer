@@ -54,6 +54,9 @@ GPUProject/
 # Dependencies
 external/glfw/
 
+# Screenshots (generated at runtime)
+screenshots/
+
 # Assets (keep structure, ignore large files)
 assets/models/*.obj
 assets/models/*.fbx

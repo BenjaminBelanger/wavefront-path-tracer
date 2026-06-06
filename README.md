@@ -25,18 +25,18 @@ A GPU-accelerated wavefront path tracer built from scratch in CUDA C++17. Render
   generate_rays_kernel        1 ray per pixel, jittered + optional DOF
        |
        v
-  +-----------  bounce loop (up to 8 bounces)  -----------+
+  +-----------  bounce loop (up to 8 bounces)   -----------+
   |                                                        |
   |  intersect_kernel         BVH traversal per active ray |
   |       |                                                |
-  |  shade_miss_kernel        HDRI environment / gradient   |
-  |       |                   sky fallback                  |
+  |  shade_miss_kernel        HDRI environment / gradient  |
+  |       |                   sky fallback                 |
   |       |                                                |
   |  shade_surface_kernel     BSDF sampling, Russian       |
   |       |                   roulette (depth > 3),        |
-  |       |                   emissive hit detection        |
+  |       |                   emissive hit detection       |
   |       |                                                |
-  |  swap work queues         compact via atomicAdd         |
+  |  swap work queues         compact via atomicAdd        |
   +--------------------------------------------------------+
        |
   accumulate_kernel           progressive running average
@@ -93,9 +93,12 @@ Target CUDA architectures: SM 75 (Turing), SM 86 (Ampere), SM 89 (Ada Lovelace).
 | Scroll wheel | Zoom in/out |
 | `+` / `-` | Adjust exposure |
 | `R` | Reset accumulation |
+| `P` | Save screenshot (PNG) |
 | `Esc` | Quit |
 
 The camera automatically frames loaded scenes based on world bounds.
+
+Pressing `P` writes the current frame to `screenshots/screenshot_YYYYMMDD_HHMMSS.png` (the directory is created automatically next to the working directory).
 
 ## Project Structure
 

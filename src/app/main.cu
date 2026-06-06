@@ -9,6 +9,18 @@
 
 using namespace wpt;
 
+// On NVIDIA Optimus laptops the OpenGL context is created on the integrated GPU
+// by default, which breaks CUDA-OpenGL interop (CUDA runs on the discrete GPU).
+// Exporting these symbols forces the system to select the high-performance NVIDIA
+// GPU for this process, keeping OpenGL and CUDA on the same device.
+#if defined(_WIN32)
+extern "C"
+{
+    __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+    __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+#endif
+
 void print_cuda_info()
 {
     int device_count = 0;

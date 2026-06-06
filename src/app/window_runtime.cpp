@@ -2,7 +2,15 @@
 
 #include <cstdlib>
 #include <cstdio>
+#include <cstring>
+#include <ctime>
 #include <iostream>
+#include <filesystem>
+#include <string>
+#include <vector>
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb/stb_image_write.h"
 
 #define GLFW_INCLUDE_NONE
 #include <glad/glad.h>
@@ -46,7 +54,7 @@ namespace wpt
 {
 
     RenderWindow::RenderWindow(int width, int height, const char *title)
-        : width_(width), height_(height), window_(nullptr), shader_program_(0), vao_(0), vbo_(0), texture_(0), pbo_(0), cuda_pbo_resource_(nullptr), camera_changed_(true), renderer_(nullptr)
+        : width_(width), height_(height), window_(nullptr), shader_program_(0), vao_(0), vbo_(0), texture_(0), pbo_(0), cuda_pbo_resource_(nullptr), camera_changed_(true), screenshot_requested_(false), renderer_(nullptr)
     {
         if (!glfwInit())
         {
@@ -135,6 +143,7 @@ namespace wpt
         std::cout << "  Scroll: Zoom in/out" << std::endl;
         std::cout << "  +/-: Adjust exposure" << std::endl;
         std::cout << "  R: Reset accumulation" << std::endl;
+        std::cout << "  P: Save screenshot (PNG)" << std::endl;
         std::cout << "  ESC: Quit" << std::endl;
         std::cout << std::endl;
 
@@ -183,6 +192,13 @@ namespace wpt
                 break;
             }
             renderer.tonemap_to_buffer(mapped_buffer);
+
+            if (screenshot_requested_)
+            {
+                save_screenshot(mapped_buffer);
+                screenshot_requested_ = false;
+            }
+
             CUDA_RUNTIME_CHECK(cudaGraphicsUnmapResources(1, &cuda_pbo_resource_, 0));
 
             display_frame();
@@ -306,6 +322,51 @@ namespace wpt
         glBindVertexArray(0);
     }
 
+    void RenderWindow::save_screenshot(const uchar4 *device_buffer)
+    {
+        const size_t row_bytes = static_cast<size_t>(width_) * 4;
+        const size_t total_bytes = row_bytes * static_cast<size_t>(height_);
+
+        std::vector<unsigned char> host(total_bytes);
+        CUDA_RUNTIME_CHECK(cudaMemcpy(host.data(), device_buffer, total_bytes,
+                                      cudaMemcpyDeviceToHost));
+
+        // The displayed texture samples buffer row 0 at the bottom of the image,
+        // so flip vertically to produce a conventional top-down PNG.
+        std::vector<unsigned char> flipped(total_bytes);
+        for (int y = 0; y < height_; ++y)
+        {
+            std::memcpy(&flipped[static_cast<size_t>(y) * row_bytes],
+                        &host[static_cast<size_t>(height_ - 1 - y) * row_bytes],
+                        row_bytes);
+        }
+
+        std::error_code ec;
+        std::filesystem::create_directories("screenshots", ec);
+
+        std::time_t now = std::time(nullptr);
+        std::tm tm_buf{};
+#if defined(_WIN32)
+        localtime_s(&tm_buf, &now);
+#else
+        localtime_r(&now, &tm_buf);
+#endif
+        char stamp[32];
+        std::strftime(stamp, sizeof(stamp), "%Y%m%d_%H%M%S", &tm_buf);
+
+        std::string path = std::string("screenshots/screenshot_") + stamp + ".png";
+
+        if (stbi_write_png(path.c_str(), width_, height_, 4, flipped.data(),
+                           static_cast<int>(row_bytes)))
+        {
+            std::cout << "Saved screenshot: " << path << std::endl;
+        }
+        else
+        {
+            std::cerr << "Failed to save screenshot: " << path << std::endl;
+        }
+    }
+
     void RenderWindow::mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
     {
         (void)mods;
@@ -357,6 +418,10 @@ namespace wpt
             break;
         case GLFW_KEY_R:
             self->camera_changed_ = true;
+            break;
+        case GLFW_KEY_P:
+            if (action == GLFW_PRESS)
+                self->screenshot_requested_ = true;
             break;
         case GLFW_KEY_EQUAL:
         case GLFW_KEY_KP_ADD:

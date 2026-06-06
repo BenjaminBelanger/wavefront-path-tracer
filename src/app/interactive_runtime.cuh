@@ -50,6 +50,7 @@ namespace wpt
     private:
         void init_gl_resources();
         void display_frame();
+        void save_screenshot(const uchar4 *device_buffer);
 
         static void mouse_button_callback(GLFWwindow *window, int button, int action, int mods);
         static void cursor_pos_callback(GLFWwindow *window, double xpos, double ypos);
@@ -67,6 +68,7 @@ namespace wpt
         cudaGraphicsResource *cuda_pbo_resource_;
         CameraController controller_;
         bool camera_changed_;
+        bool screenshot_requested_;
         InteractiveRenderer *renderer_;
     };
 
