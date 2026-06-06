@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "../../core/math/vector.cuh"
 #include "../../core/math/sampling.cuh"
 #include "../../core/math/spectral.cuh"

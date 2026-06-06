@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include "../../core/memory/device_buffer.cuh"
 

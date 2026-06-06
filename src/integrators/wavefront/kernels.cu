@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include "path_state.cuh"
 #include "ray_queue.cuh"
 #include "../../core/math/spectral.cuh"

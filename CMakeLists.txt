@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(WavefrontPathTracer LANGUAGES CXX CUDA)
+project(WavefrontPathTracer LANGUAGES C CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,7 +8,9 @@ set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-    set(CMAKE_CUDA_ARCHITECTURES 75 86 89)
+    # 75 Turing(T4) | 80 Ampere(A100) | 86 Ampere(A10/A10G/A6000/RTX30)
+    # 89 Ada(RTX40/L4) | 90 Hopper(H100) | 120 Blackwell(RTX50). 120 needs CUDA >= 12.8.
+    set(CMAKE_CUDA_ARCHITECTURES 75 80 86 89 90 120)
 endif()
 
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
@@ -149,9 +151,11 @@ target_compile_options(wavefront-path-tracer PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:
         --use_fast_math
         --expt-relaxed-constexpr
-        -Xcompiler=/W3
         -lineinfo
     >
+    # Host-compiler warning level: MSVC uses /W3, GCC/Clang use -Wall.
+    $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CXX_COMPILER_ID:MSVC>>:-Xcompiler=/W3>
+    $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-Xcompiler=-Wall>
     $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:-G -g>
     $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Release>>:-O3>
 )
