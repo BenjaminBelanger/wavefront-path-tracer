@@ -7,6 +7,7 @@
 #include "../core/memory/device_buffer.cuh"
 #include "../integrators/wavefront/path_state.cuh"
 #include "../integrators/wavefront/ray_queue.cuh"
+#include "../lighting/light_sampling.cuh"
 
 namespace wpt
 {
@@ -43,12 +44,23 @@ namespace wpt
         const HitInfoView &hits,
         const Material *materials,
         const cudaTextureObject_t *textures,
+        const Triangle *triangles_array,
+        LightTableView light_table,
+        ShadowRayView shadow_queue,
         const int *active_paths,
         unsigned int *next_count,
         int *next_paths,
         const unsigned int *active_count_ptr,
         int max_threads,
         int max_depth);
+
+    void launch_trace_shadow(
+        PathStateView paths,
+        const BVHNode *bvh_nodes,
+        const TrianglePrecomputed *precomputed,
+        ShadowRayView shadow_queue,
+        const unsigned int *shadow_count_ptr,
+        int max_threads);
 
     void launch_accumulate(
         const PathStateView &paths,
@@ -76,6 +88,7 @@ namespace wpt
         PathStateSoA path_state;
         HitInfoSoA hit_info;
         WorkQueues work_queues;
+        ShadowRaySoA shadow_rays;
 
         DeviceBuffer<float4> accumulation_buffer;
         DeviceBuffer<int> sample_count;
@@ -92,6 +105,7 @@ namespace wpt
             hit_info.resize(num_pixels);
 
             work_queues.resize(num_pixels);
+            shadow_rays.resize(num_pixels);
 
             accumulation_buffer.resize(num_pixels);
             sample_count.resize(num_pixels);
@@ -152,6 +166,9 @@ namespace wpt
                               impl_->num_pixels * sizeof(int), cudaMemcpyDeviceToDevice));
         impl_->work_queues.set_active_count(impl_->num_pixels);
 
+        ShadowRayView shadow_view = make_view(impl_->shadow_rays);
+        LightTableView light_table = scene.light_table();
+
         for (int depth = 0; depth < impl_->max_depth; depth++)
         {
             launch_intersect(paths, hits, scene.bvh_nodes(), scene.precomputed_triangles(),
@@ -165,14 +182,22 @@ namespace wpt
             CUDA_CHECK_LAST();
 
             CUDA_CHECK(cudaMemset(impl_->work_queues.next_count_ptr(), 0, sizeof(unsigned int)));
+            impl_->shadow_rays.clear();
 
             launch_shade_surface(paths, hits, scene.materials(),
                                  scene.textures(),
+                                 scene.triangles(),
+                                 light_table,
+                                 shadow_view,
                                  impl_->work_queues.active_paths(),
                                  impl_->work_queues.next_count_ptr(),
                                  impl_->work_queues.next_paths(),
                                  impl_->work_queues.active_count_ptr(), impl_->num_pixels,
                                  impl_->max_depth);
+            CUDA_CHECK_LAST();
+
+            launch_trace_shadow(paths, scene.bvh_nodes(), scene.precomputed_triangles(),
+                                shadow_view, impl_->shadow_rays.count.data(), impl_->num_pixels);
             CUDA_CHECK_LAST();
 
             impl_->work_queues.swap_queues();

@@ -3,6 +3,7 @@
 #include "../../core/math/spectral.cuh"
 #include "../../geometry/bvh/bvh.cuh"
 #include "../../geometry/primitives/triangle.cuh"
+#include "../../lighting/light_sampling.cuh"
 #include "../../materials/bsdf/lambert.cuh"
 #include "../../materials/bsdf/ggx.cuh"
 #include "../../app/camera.cuh"
@@ -54,6 +55,7 @@ namespace wpt
         paths.depth[pixel_idx] = 0;
         paths.flags[pixel_idx] = PATH_ACTIVE;
         paths.material_id[pixel_idx] = -1;
+        paths.last_bsdf_pdf[pixel_idx] = 0.0f;
 
         SpectralSample wavelengths = sample_hero_wavelength(rng.next_float());
         for (int i = 0; i < NUM_WAVELENGTHS; i++)
@@ -197,11 +199,25 @@ namespace wpt
         paths.set_active(path_idx, false);
     }
 
+    __device__ inline bool material_supports_nee(const Material &m)
+    {
+        if (m.is_emissive())
+            return false;
+        if (m.type == MaterialType::Dielectric)
+            return false;
+        if (m.type == MaterialType::Metal && m.roughness < 0.01f)
+            return false;
+        return true;
+    }
+
     __global__ void shade_surface_kernel(
         PathStateView paths,
         const HitInfoView hits,
         const Material *__restrict__ materials,
         const cudaTextureObject_t *__restrict__ textures,
+        const Triangle *__restrict__ triangles_array,
+        LightTableView light_table,
+        ShadowRayView shadow_queue,
         const int *__restrict__ active_paths,
         unsigned int *__restrict__ next_count,
         int *__restrict__ next_paths,
@@ -273,7 +289,25 @@ namespace wpt
             float3 throughput = paths.get_throughput(path_idx);
             float3 emission = material.get_emission();
 
-            paths.add_radiance(path_idx, throughput * emission);
+            uint32_t flags = paths.flags[path_idx];
+            bool was_specular = (flags & PATH_SPECULAR) != 0;
+            float last_pdf = paths.last_bsdf_pdf[path_idx];
+
+            float mis_weight = 1.0f;
+            if (depth > 0 && !was_specular && light_table.count > 0 && last_pdf > 0.0f)
+            {
+                float dist = hits.t[path_idx];
+                float dist_sq = dist * dist;
+                float cos_light = fabsf(dot(geom_normal, -ray_dir));
+                if (cos_light > 0.0f)
+                {
+                    float pdf_area = light_table.pdf_area();
+                    float light_pdf_sa = light_pdf_solid_angle(pdf_area, dist_sq, cos_light);
+                    mis_weight = power_heuristic(last_pdf, light_pdf_sa);
+                }
+            }
+
+            paths.add_radiance(path_idx, throughput * emission * mis_weight);
 
             paths.set_active(path_idx, false);
             return;
@@ -302,6 +336,59 @@ namespace wpt
             paths.set_throughput(path_idx, throughput);
         }
 
+        if (material_supports_nee(material) && light_table.count > 0 && light_table.total_area > 0.0f)
+        {
+            float u_pick = rng.next_float();
+            int li = light_table.sample_index(u_pick);
+            const LightTriangle &lt = light_table.entries[li];
+            const Triangle &tri = triangles_array[lt.prim_id];
+
+            float u1 = rng.next_float();
+            float u2 = rng.next_float();
+            float3 light_normal;
+            float3 light_pt = sample_triangle_point(tri, u1, u2, light_normal);
+
+            float3 to_light = light_pt - hit_pos;
+            float dist_sq = dot(to_light, to_light);
+            float dist = sqrtf(fmaxf(dist_sq, 1e-12f));
+            float3 wi = to_light / dist;
+
+            float cos_surf = dot(ctx.normal, wi);
+            float cos_light = fabsf(dot(light_normal, -wi));
+
+            if (cos_surf > 0.0f && cos_light > 0.0f)
+            {
+                float pdf_area = light_table.pdf_area();
+                float light_pdf_sa = light_pdf_solid_angle(pdf_area, dist_sq, cos_light);
+
+                if (light_pdf_sa > 0.0f)
+                {
+                    float3 f_bsdf = evaluate_bsdf(material, ctx, wi);
+                    float bsdf_pdf = pdf_bsdf(material, ctx, wi);
+
+                    if (f_bsdf.x + f_bsdf.y + f_bsdf.z > 0.0f)
+                    {
+                        float w = power_heuristic(light_pdf_sa, bsdf_pdf);
+                        float3 Le = materials[lt.material_id].get_emission();
+                        float3 contrib = throughput * f_bsdf * cos_surf * Le * w / light_pdf_sa;
+
+                        contrib = clamp(contrib, 0.0f, 100.0f);
+
+                        if (contrib.x + contrib.y + contrib.z > 0.0f)
+                        {
+                            float origin_sign = (dot(wi, ctx.geometric_normal) >= 0.0f) ? 1.0f : -1.0f;
+                            float3 sh_origin = hit_pos + ctx.geometric_normal * (RAY_EPSILON * origin_sign);
+                            float sh_tmax = dist - 4.0f * RAY_EPSILON;
+                            if (sh_tmax > RAY_EPSILON)
+                            {
+                                shadow_queue.push(path_idx, sh_origin, wi, sh_tmax, contrib);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         BSDFSample sample = sample_bsdf(material, ctx, rng.next_float(), rng.next_float(), rng.next_float());
 
         if (!sample.is_valid())
@@ -327,10 +414,12 @@ namespace wpt
         if (sample.is_specular)
         {
             paths.flags[path_idx] |= PATH_SPECULAR;
+            paths.last_bsdf_pdf[path_idx] = 0.0f;
         }
         else
         {
             paths.flags[path_idx] &= ~PATH_SPECULAR;
+            paths.last_bsdf_pdf[path_idx] = sample.pdf;
         }
 
         paths.depth[path_idx] = depth + 1;
@@ -343,31 +432,35 @@ namespace wpt
         PathStateView paths,
         const BVHNode *__restrict__ bvh_nodes,
         const TrianglePrecomputed *__restrict__ precomputed,
-        const float3 *__restrict__ shadow_origins,
-        const float3 *__restrict__ shadow_directions,
-        const float *__restrict__ shadow_max_t,
-        const float3 *__restrict__ shadow_contributions,
-        const int *__restrict__ shadow_path_indices,
-        int shadow_count)
+        ShadowRayView shadow_queue,
+        const unsigned int *__restrict__ shadow_count_ptr)
     {
         int idx = blockIdx.x * blockDim.x + threadIdx.x;
-        if (idx >= shadow_count)
+        if (idx >= *shadow_count_ptr)
             return;
 
-        int path_idx = shadow_path_indices[idx];
+        int path_idx = shadow_queue.path_idx[idx];
 
         Ray shadow_ray;
-        shadow_ray.origin = shadow_origins[idx];
-        shadow_ray.direction = shadow_directions[idx];
+        shadow_ray.origin = make_float3(
+            shadow_queue.origin_x[idx],
+            shadow_queue.origin_y[idx],
+            shadow_queue.origin_z[idx]);
+        shadow_ray.direction = make_float3(
+            shadow_queue.dir_x[idx],
+            shadow_queue.dir_y[idx],
+            shadow_queue.dir_z[idx]);
         shadow_ray.t_min = RAY_EPSILON;
-        shadow_ray.t_max = shadow_max_t[idx] - RAY_EPSILON;
+        shadow_ray.t_max = shadow_queue.t_max[idx];
 
         bool occluded = traverse_bvh_shadow(bvh_nodes, precomputed, shadow_ray);
 
         if (!occluded)
         {
-
-            float3 contribution = shadow_contributions[idx];
+            float3 contribution = make_float3(
+                shadow_queue.contrib_x[idx],
+                shadow_queue.contrib_y[idx],
+                shadow_queue.contrib_z[idx]);
             paths.add_radiance(path_idx, contribution);
         }
     }
@@ -549,6 +642,9 @@ namespace wpt
         const HitInfoView &hits,
         const Material *materials,
         const cudaTextureObject_t *textures,
+        const Triangle *triangles_array,
+        LightTableView light_table,
+        ShadowRayView shadow_queue,
         const int *active_paths,
         unsigned int *next_count,
         int *next_paths,
@@ -558,8 +654,24 @@ namespace wpt
     {
         int block = 256;
         int grid = (max_threads + block - 1) / block;
-        shade_surface_kernel<<<grid, block>>>(paths, hits, materials, textures, active_paths,
-                                              next_count, next_paths, active_count_ptr, max_depth);
+        shade_surface_kernel<<<grid, block>>>(paths, hits, materials, textures,
+                                              triangles_array, light_table, shadow_queue,
+                                              active_paths, next_count, next_paths,
+                                              active_count_ptr, max_depth);
+    }
+
+    void launch_trace_shadow(
+        PathStateView paths,
+        const BVHNode *bvh_nodes,
+        const TrianglePrecomputed *precomputed,
+        ShadowRayView shadow_queue,
+        const unsigned int *shadow_count_ptr,
+        int max_threads)
+    {
+        int block = 256;
+        int grid = (max_threads + block - 1) / block;
+        trace_shadow_kernel<<<grid, block>>>(paths, bvh_nodes, precomputed,
+                                             shadow_queue, shadow_count_ptr);
     }
 
     void launch_accumulate(
