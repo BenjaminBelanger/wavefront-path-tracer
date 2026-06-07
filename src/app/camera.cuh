@@ -83,6 +83,20 @@ namespace wpt
             update();
         }
 
+        // Distance along the view axis required to fully fit a bounding sphere of
+        // the given radius within the frame. Considers both the vertical and
+        // horizontal field of view (so the tighter axis never clips) and uses the
+        // sphere-correct sin() fit rather than a flat-disk tan() fit. `margin`
+        // (>= 1) leaves breathing room so the scene never touches the frame edges.
+        __host__ __device__ float frame_distance(float radius, float margin = 1.05f) const
+        {
+            float r = fmaxf(radius, 1e-4f);
+            float half_v = fov * 0.5f;
+            float half_h = atanf(aspect_ratio * tanf(half_v));
+            float min_half = fmaxf(fminf(half_v, half_h), 1e-3f);
+            return r / sinf(min_half) * margin;
+        }
+
         __host__ void orbit(float delta_yaw, float delta_pitch)
         {
             float3 offset = position - target;

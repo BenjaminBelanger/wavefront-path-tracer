@@ -1,9 +1,11 @@
 #include "interactive_runtime.cuh"
+#include "camera_animation.cuh"
 
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <chrono>
 #include <iostream>
 #include <filesystem>
 #include <string>
@@ -16,13 +18,20 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-#if defined(_WIN32)
+// Prevent the system OpenGL headers (pulled in by cuda_gl_interop.h) from
+// redeclaring the GL entry points that glad already defines as function
+// pointers. On Linux GL/gl.h also pulls glext, so guard those too.
 #ifndef __gl_h_
 #define __gl_h_
 #endif
 #ifndef __GL_H__
 #define __GL_H__
 #endif
+#ifndef __gl_glext_h_
+#define __gl_glext_h_
+#endif
+#ifndef __glext_h_
+#define __glext_h_
 #endif
 #include <cuda_gl_interop.h>
 
@@ -209,7 +218,7 @@ namespace wpt
 
     void RenderWindow::frame_scene(float3 center, float radius)
     {
-        float distance = radius / tanf(controller_.camera.fov * 0.5f) * 1.5f;
+        float distance = controller_.camera.frame_distance(radius);
 
         float3 cam_pos = center - ::make_float3(0.0f, 0.0f, distance);
 
@@ -438,6 +447,148 @@ namespace wpt
             }
             break;
         }
+    }
+
+    namespace
+    {
+        // Tonemaps the renderer's accumulated result into `device_buffer`, copies
+        // it to the host, flips it to a conventional top-down orientation and
+        // writes it as a PNG. Returns true on success.
+        bool tonemap_and_write_png(InteractiveRenderer &renderer, uchar4 *device_buffer,
+                                   int width, int height, const std::string &output_path)
+        {
+            renderer.tonemap_to_buffer(device_buffer);
+            CUDA_RUNTIME_CHECK(cudaDeviceSynchronize());
+
+            const size_t row_bytes = static_cast<size_t>(width) * 4;
+            const size_t total_bytes = row_bytes * static_cast<size_t>(height);
+
+            std::vector<unsigned char> host(total_bytes);
+            CUDA_RUNTIME_CHECK(cudaMemcpy(host.data(), device_buffer, total_bytes,
+                                          cudaMemcpyDeviceToHost));
+
+            // Row 0 is the bottom of the image; flip to a conventional top-down PNG.
+            std::vector<unsigned char> flipped(total_bytes);
+            for (int y = 0; y < height; ++y)
+            {
+                std::memcpy(&flipped[static_cast<size_t>(y) * row_bytes],
+                            &host[static_cast<size_t>(height - 1 - y) * row_bytes],
+                            row_bytes);
+            }
+
+            std::filesystem::path out_path(output_path);
+            if (out_path.has_parent_path())
+            {
+                std::error_code ec;
+                std::filesystem::create_directories(out_path.parent_path(), ec);
+            }
+
+            return stbi_write_png(output_path.c_str(), width, height, 4, flipped.data(),
+                                  static_cast<int>(row_bytes)) != 0;
+        }
+    }
+
+    int run_headless(InteractiveRenderer &renderer, Scene &scene, const Camera &camera,
+                     int width, int height, int frames, const std::string &output_path)
+    {
+        if (frames < 1)
+            frames = 1;
+
+        const size_t num_pixels = static_cast<size_t>(width) * static_cast<size_t>(height);
+
+        uchar4 *device_buffer = nullptr;
+        CUDA_RUNTIME_CHECK(cudaMalloc(&device_buffer, num_pixels * sizeof(uchar4)));
+
+        renderer.reset_accumulation();
+
+        std::cout << "\nHeadless render: " << width << "x" << height << ", "
+                  << frames << " samples/pixel" << std::endl;
+
+        const auto t0 = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < frames; ++i)
+        {
+            renderer.render_frame(camera, scene);
+            if ((i + 1) % 16 == 0 || (i + 1) == frames)
+            {
+                CUDA_RUNTIME_CHECK(cudaDeviceSynchronize());
+                std::cout << "\r  sample " << (i + 1) << "/" << frames << std::flush;
+            }
+        }
+        CUDA_RUNTIME_CHECK(cudaDeviceSynchronize());
+        const auto t1 = std::chrono::high_resolution_clock::now();
+
+        const double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+        std::cout << "\n  " << ms << " ms total, " << (ms / frames)
+                  << " ms/sample, " << (frames * 1000.0 / ms) << " samples/s" << std::endl;
+
+        const bool ok = tonemap_and_write_png(renderer, device_buffer, width, height, output_path);
+        CUDA_RUNTIME_CHECK(cudaFree(device_buffer));
+
+        if (ok)
+        {
+            std::cout << "Saved render: " << output_path << std::endl;
+            return 0;
+        }
+
+        std::cerr << "Failed to save render: " << output_path << std::endl;
+        return 1;
+    }
+
+    int run_animation(InteractiveRenderer &renderer, Scene &scene, const Camera &base_camera,
+                      int width, int height, int spp, const AnimationConfig &config,
+                      const std::string &output_dir)
+    {
+        const int frames = (config.frames > 0) ? config.frames : 1;
+        const int samples = (spp > 0) ? spp : 1;
+
+        std::filesystem::path dir(output_dir);
+        std::error_code ec;
+        std::filesystem::create_directories(dir, ec);
+
+        const size_t num_pixels = static_cast<size_t>(width) * static_cast<size_t>(height);
+
+        uchar4 *device_buffer = nullptr;
+        CUDA_RUNTIME_CHECK(cudaMalloc(&device_buffer, num_pixels * sizeof(uchar4)));
+
+        std::cout << "\nHeadless animation: " << animation_preset_name(config.preset) << ", "
+                  << frames << " frames @ " << width << "x" << height << ", "
+                  << samples << " spp/frame" << std::endl;
+
+        const auto t0 = std::chrono::high_resolution_clock::now();
+        for (int f = 0; f < frames; ++f)
+        {
+            const Camera camera = animate_camera(base_camera, config, f);
+
+            renderer.reset_accumulation();
+            for (int s = 0; s < samples; ++s)
+            {
+                renderer.render_frame(camera, scene);
+            }
+            CUDA_RUNTIME_CHECK(cudaDeviceSynchronize());
+
+            char name[32];
+            std::snprintf(name, sizeof(name), "frame%04d.png", f);
+            const std::string frame_path = (dir / name).string();
+
+            if (!tonemap_and_write_png(renderer, device_buffer, width, height, frame_path))
+            {
+                std::cerr << "\nFailed to save frame: " << frame_path << std::endl;
+                CUDA_RUNTIME_CHECK(cudaFree(device_buffer));
+                return 1;
+            }
+
+            std::cout << "\r  frame " << (f + 1) << "/" << frames << std::flush;
+        }
+        CUDA_RUNTIME_CHECK(cudaDeviceSynchronize());
+        const auto t1 = std::chrono::high_resolution_clock::now();
+
+        CUDA_RUNTIME_CHECK(cudaFree(device_buffer));
+
+        const double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+        std::cout << "\n  " << ms << " ms total, " << (ms / frames)
+                  << " ms/frame" << std::endl;
+        std::cout << "Saved " << frames << " frames to: " << dir.string() << std::endl;
+        return 0;
     }
 
 }

@@ -1,8 +1,11 @@
 #pragma once
 
+#include <string>
+
 #include <cuda_runtime.h>
 
 #include "camera.cuh"
+#include "camera_animation.cuh"
 
 struct GLFWwindow;
 struct cudaGraphicsResource;
@@ -71,5 +74,18 @@ namespace wpt
         bool screenshot_requested_;
         InteractiveRenderer *renderer_;
     };
+
+    // Headless rendering: accumulates `frames` samples into a plain CUDA buffer
+    // and writes the tonemapped result to a PNG. Requires no window, GL context
+    // or display, so it works over a bare SSH session on a cloud GPU.
+    int run_headless(InteractiveRenderer &renderer, Scene &scene, const Camera &camera,
+                     int width, int height, int frames, const std::string &output_path);
+
+    // Headless camera animation: renders a sequence of frames along a built-in
+    // camera path preset (orbit/dolly), accumulating `spp` samples per frame and
+    // writing frameNNNN.png into `output_dir`. Requires no window or display.
+    int run_animation(InteractiveRenderer &renderer, Scene &scene, const Camera &base_camera,
+                      int width, int height, int spp, const AnimationConfig &config,
+                      const std::string &output_dir);
 
 }

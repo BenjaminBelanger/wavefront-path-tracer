@@ -98,7 +98,7 @@ namespace wpt
         float env_intensity;
 
         Impl(int width_in, int height_in)
-            : width(width_in), height(height_in), num_pixels(width_in * height_in), frame_number(0), total_samples(0), exposure(0.06f), max_depth(8), env_map(0), env_intensity(1.0f)
+            : width(width_in), height(height_in), num_pixels(width_in * height_in), frame_number(0), total_samples(0), exposure(0.46f), max_depth(8), env_map(0), env_intensity(1.0f)
         {
 
             path_state.resize(num_pixels);

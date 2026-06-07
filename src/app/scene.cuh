@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+
 #include "../core/math/vector.cuh"
 #include "../core/memory/device_buffer.cuh"
 #include "../geometry/bvh/bvh.cuh"
@@ -90,6 +93,15 @@ namespace wpt
                 t.material_id = material_id;
                 triangles_.push_back(t);
             }
+        }
+
+        // Reassign every existing triangle to a single material. Used to override the
+        // look of a loaded OBJ that has no usable MTL (e.g. bare test meshes).
+        void set_all_triangle_material(const Material &mat)
+        {
+            int id = add_material(mat);
+            for (auto &tri : triangles_)
+                tri.material_id = id;
         }
 
         void add_sphere(const Sphere &sphere)
@@ -204,6 +216,46 @@ namespace wpt
                 rim_mat));
         }
 
+        void add_ground_plane(float size_mult = 8.0f, const float3 &color = make_float3(0.4f))
+        {
+            if (triangles_.empty())
+                return;
+
+            AABB bounds;
+            for (const auto &tri : triangles_)
+            {
+                bounds.expand(tri.v0);
+                bounds.expand(tri.v1);
+                bounds.expand(tri.v2);
+            }
+            if (!bounds.is_valid())
+                return;
+
+            subject_bounds_ = bounds;
+            has_subject_bounds_ = true;
+
+            float3 center = bounds.center();
+            float3 ext = bounds.extent();
+            float diag = length(ext);
+            float h = fmaxf(ext.x, ext.z) * size_mult;
+            if (h <= 0.0f)
+                h = diag * size_mult;
+
+            float y = bounds.min_bound.y - diag * 1e-4f;
+            int floor_mat = add_material(Material::diffuse(color));
+
+            add_triangle(Triangle(
+                make_float3(center.x - h, y, center.z - h),
+                make_float3(center.x - h, y, center.z + h),
+                make_float3(center.x + h, y, center.z + h),
+                floor_mat));
+            add_triangle(Triangle(
+                make_float3(center.x - h, y, center.z - h),
+                make_float3(center.x + h, y, center.z + h),
+                make_float3(center.x + h, y, center.z - h),
+                floor_mat));
+        }
+
         TextureManager &texture_manager() { return texture_manager_; }
         const cudaTextureObject_t *textures() const { return texture_manager_.device_textures(); }
 
@@ -266,6 +318,10 @@ namespace wpt
         int num_spheres() const { return static_cast<int>(spheres_.size()); }
 
         AABB world_bounds() const { return bvh_.world_bounds(); }
+
+        // Bounds to auto-frame the camera on. Excludes any added ground plane so a
+        // large floor doesn't make the subject tiny in frame.
+        AABB framing_bounds() const { return has_subject_bounds_ ? subject_bounds_ : world_bounds(); }
 
         static Scene create_cornell_box()
         {
@@ -412,6 +468,8 @@ namespace wpt
         LightTable light_table_;
         int env_map_index_ = -1;
         float env_map_intensity_ = 2.0f;
+        AABB subject_bounds_;
+        bool has_subject_bounds_ = false;
     };
 
 }
