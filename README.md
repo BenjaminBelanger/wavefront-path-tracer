@@ -2,20 +2,40 @@
 
 A GPU-accelerated wavefront path tracer built from scratch in CUDA C++17. Renders physically-based scenes interactively at 1920x1080 with real-time camera control via CUDA-OpenGL interop. Supports OBJ mesh loading, HDRI environment maps, texture-mapped materials, and a physically-based shading system, with some experimental spectral and ReSTIR code also present in the repository.
 
-<!-- If you have a screenshot, uncomment and add the path: -->
-<!-- ![Wavefront Path Tracer render](assets/screenshot.png) -->
+## Showcase
+
+![Dragon mesh](docs/demo/media/hero/mesh_dragon.png)
+
+*Gold dragon: SAH-BVH traversal on a 249k-triangle OBJ mesh with HDRI lighting.*
+
+![Material gallery](docs/demo/media/hero/materials_gallery.png)
+
+*Material gallery: the full BSDF set across a GGX roughness sweep.*
+
+<img src="docs/demo/media/hero/cornell.png" alt="Cornell box" width="80%">
+
+*Cornell box: global illumination, color bleeding, soft area-light shadows.*
+
+### Live orbit (real-time CUDA-OpenGL interop)
+
+<p align="center" width="100%">
+
+<video src="https://github.com/user-attachments/assets/8f6f9c4b-beec-4c37-9baa-40f5643f66d5" width="80%" controls></video>
+</p>
+
+**See the full [demo & results page](docs/demo/README.md)** for more renders, the live orbit video, and RTX 4090 benchmarks.
 
 ## Highlights
 
-- **Wavefront path tracing** -- separates ray generation, intersection, shading, and accumulation into distinct GPU kernels for maximum occupancy and minimal warp divergence
-- **Structure-of-Arrays (SoA) memory layout** -- all per-path and per-hit data is stored in SoA form (`PathStateSoA`, `HitInfoSoA`, `ReservoirSoA`) with `__restrict__` pointer views for coalesced global memory access
-- **Physically-based material system** -- Lambertian, Oren-Nayar rough diffuse, GGX metal, rough/smooth dielectric, plastic, thin-film, and emissive materials
-- **Texture-mapped materials** -- per-material albedo, roughness, and normal textures are sampled in the main shading path, and the OBJ loader wires common material texture fields when present
-- **OBJ mesh loading** -- import arbitrary triangle meshes with per-vertex normals, UV coordinates, optional normal recalculation, and configurable scale/transform
-- **HDRI environment mapping** -- HDR radiance environment maps with configurable intensity for image-based lighting
-- **SAH-accelerated BVH** -- CPU-built surface area heuristic BVH with stackful GPU traversal, watertight triangle intersection, and dedicated shadow ray occlusion test
-- **CUDA-OpenGL interop** -- zero-copy display via pixel buffer object (PBO); CUDA writes tonemapped pixels directly into the mapped OpenGL buffer each frame
-- **ACES tonemapping + sRGB gamma** -- HDR accumulation buffer with progressive running average, ACES filmic curve, interactive exposure control, and proper linear-to-sRGB conversion
+- **Wavefront path tracing** - separates ray generation, intersection, shading, and accumulation into distinct GPU kernels for maximum occupancy and minimal warp divergence
+- **Structure-of-Arrays (SoA) memory layout** - all per-path and per-hit data is stored in SoA form (`PathStateSoA`, `HitInfoSoA`, `ReservoirSoA`) with `__restrict__` pointer views for coalesced global memory access
+- **Physically-based material system** - Lambertian, Oren-Nayar rough diffuse, GGX metal, rough/smooth dielectric, plastic, thin-film, and emissive materials
+- **Texture-mapped materials** - per-material albedo, roughness, and normal textures are sampled in the main shading path, and the OBJ loader wires common material texture fields when present
+- **OBJ mesh loading** - import arbitrary triangle meshes with per-vertex normals, UV coordinates, optional normal recalculation, and configurable scale/transform
+- **HDRI environment mapping** - HDR radiance environment maps with configurable intensity for image-based lighting
+- **SAH-accelerated BVH** - CPU-built surface area heuristic BVH with stackful GPU traversal, watertight triangle intersection, and dedicated shadow ray occlusion test
+- **CUDA-OpenGL interop** - zero-copy display via pixel buffer object (PBO); CUDA writes tonemapped pixels directly into the mapped OpenGL buffer each frame
+- **ACES tonemapping + sRGB gamma** - HDR accumulation buffer with progressive running average, ACES filmic curve, interactive exposure control, and proper linear-to-sRGB conversion
 
 ## Architecture
 
