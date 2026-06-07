@@ -88,6 +88,8 @@ Target CUDA architectures: SM 75 (Turing), SM 86 (Ampere), SM 89 (Ada Lovelace).
 
 ### Command-Line Options
 
+**Scene & rendering**
+
 | Option | Description | Default |
 |---|---|---|
 | `--width <n>` | Window / render width | 1920 |
@@ -96,11 +98,58 @@ Target CUDA architectures: SM 75 (Turing), SM 86 (Ampere), SM 89 (Ada Lovelace).
 | `--scale <float>` | Scale factor for loaded OBJ | 1.0 |
 | `--hdri <path>` | HDR environment map (`.hdr`) | (gradient sky) |
 | `--hdri-intensity <float>` | Environment map intensity | 2.0 |
+| `--floor` | Add a neutral ground plane under a loaded OBJ (contact shadows) | off |
+| `--material <name>` | Override a loaded OBJ's material: `gold`, `chrome`, `copper`, `silver`, `obsidian`, `jade`, `pearl`, `marble`, `glass`, `plastic` | (OBJ's own) |
+| `--cornell` | Render the built-in classic Cornell box (ignored if `--scene` is given) | off |
 | `--help` | Show usage | |
 
+**Headless rendering** (no display / window required)
+
+| Option | Description | Default |
+|---|---|---|
+| `--headless` | Render to PNG without a window | off |
+| `--frames <n>` (alias `--spp`) | Samples per pixel in headless / animation mode | 256 (64 for animation) |
+| `--output <path>` (alias `-o`) | Output PNG path in headless mode | `render.png` |
+
+**Camera framing** (applied to the auto-framed camera)
+
+| Option | Description | Default |
+|---|---|---|
+| `--cam-yaw <deg>` | Orbit the camera horizontally | 0 (straight-on) |
+| `--cam-pitch <deg>` | Orbit the camera vertically | 0 |
+| `--cam-zoom <mult>` | Scale the auto-framed distance (`<1` zooms in, `>1` out) | 1.0 |
+
+**Model orientation** (for a loaded OBJ)
+
+| Option | Description | Default |
+|---|---|---|
+| `--model-yaw <deg>` | Rotate the mesh about the vertical (Y) axis | 0 |
+| `--model-pitch <deg>` | Rotate the mesh about the X axis | 0 |
+| `--model-roll <deg>` | Rotate the mesh about the Z axis | 0 |
+
+**Headless camera animation** (implies `--headless`)
+
+| Option | Description | Default |
+|---|---|---|
+| `--animate <preset>` | Render a camera-path video. Presets: `orbit`, `dolly` | |
+| `--anim-frames <n>` | Number of frames in the animation | 120 |
+| `--fps <n>` | Frames per second for video encoding | 30 |
+| `--orbit-degrees <d>` | Total yaw sweep for the `orbit` preset | 360 |
+| `--dolly-start <m>` | Dolly distance multiplier at start | 1.0 |
+| `--dolly-end <m>` | Dolly distance multiplier at end | 0.45 |
+| `--output-dir <dir>` | Directory for the PNG frame sequence | `animation` |
+| `--video` | Encode the frame sequence to a video via ffmpeg | off |
+| `--video-format <f>` | Video container: `mp4` or `gif` | `mp4` |
+
 ```powershell
-# Example: load a mesh with an HDRI environment
+# Load a mesh with an HDRI environment (interactive)
 ./build/bin/Release/wavefront-path-tracer.exe --scene models/dragon.obj --scale 0.5 --hdri envmaps/studio.hdr
+
+# Headless hero still: 512 spp straight to PNG, no display needed
+./build/bin/Release/wavefront-path-tracer.exe --headless --scene models/bunny.obj --model-yaw 90 --floor --frames 512 -o bunny.png
+
+# Headless 360-degree orbit encoded to mp4
+./build/bin/Release/wavefront-path-tracer.exe --animate orbit --scene models/dragon.obj --anim-frames 180 --output-dir orbit_frames --video
 ```
 
 ## Controls
