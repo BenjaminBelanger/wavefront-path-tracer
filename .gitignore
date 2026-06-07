@@ -71,7 +71,36 @@ assets/textures/*.hdr
 *.nsight
 *.nvvp
 *.qdrep
+*.qdstrm
+*.nsys-rep
+*.ncu-rep
+*.sqlite
+
+# Demo artifact transfer bundles (created by scripts/cloud/save-artifacts.sh)
+demo-artifacts*.tar.gz
 
 # OS
 .DS_Store
 Thumbs.db
+
+# --- Demo showcase (curated media + profiling committed on the demo branch) ---
+# Override the broad ignores above for everything under docs/demo/.
+# Raw Nsight reports (*.nsys-rep / *.ncu-rep) stay OUT of git to keep the repo
+# lean — transfer them with scripts/cloud/save-artifacts.sh and commit only the
+# exported timeline PNG + CSV summaries. Use `git add -f` to commit a raw report.
+!docs/demo/**
+!docs/demo/**/*.png
+!docs/demo/**/*.jpg
+!docs/demo/**/*.gif
+!docs/demo/**/*.mp4
+!docs/demo/**/*.webm
+!docs/demo/**/*.csv
+!docs/demo/**/*.svg
+
+# Keep raw Nsight reports out of git even under docs/demo (re-ignore after the
+# broad !docs/demo/** rule above). Commit exported PNG/CSV instead, or `git add -f`.
+docs/demo/**/*.nsys-rep
+docs/demo/**/*.ncu-rep
+docs/demo/**/*.qdstrm
+docs/demo/**/*.qdrep
+docs/demo/**/*.sqlite
